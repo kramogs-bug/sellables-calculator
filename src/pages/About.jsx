@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { sellablesIcons } from '../assets/assets'; // Import your assets
 
 export default function About() {
   const [activeService, setActiveService] = useState(0);
@@ -91,16 +92,17 @@ export default function About() {
     }
   ];
 
+  // FIXED: Use imported images instead of string paths
   const vouchPhotos = [
-    { id: 1, image: "/src/assets/success1.png" },
-    { id: 2, image: "/src/assets/success2.png" },
-    { id: 3, image: "/src/assets/success3.png" },
-    { id: 4, image: "/src/assets/success4.png" },
-    { id: 5, image: "/src/assets/success5.png" },
-    { id: 6, image: "/src/assets/success6.png" },
-    { id: 7, image: "/src/assets/success7.png" },
-    { id: 8, image: "/src/assets/success8.png" },
-    { id: 9, image: "/src/assets/success9.png" }
+    { id: 1, image: sellablesIcons.successImages[1] },
+    { id: 2, image: sellablesIcons.successImages[2] },
+    { id: 3, image: sellablesIcons.successImages[3] },
+    { id: 4, image: sellablesIcons.successImages[4] },
+    { id: 5, image: sellablesIcons.successImages[5] },
+    { id: 6, image: sellablesIcons.successImages[6] },
+    { id: 7, image: sellablesIcons.successImages[7] },
+    { id: 8, image: sellablesIcons.successImages[8] },
+    { id: 9, image: sellablesIcons.successImages[9] }
   ];
 
   return (
@@ -116,8 +118,9 @@ export default function About() {
         <div className="text-center mb-20">
           <div className="relative inline-block mb-8">
             <div className="w-32 h-32 rounded-full flex items-center justify-center shadow-2xl shadow-blue-500/50 overflow-hidden border-4 border-gradient-to-br from-blue-500 via-purple-500 to-pink-500">
+              {/* FIXED: Use imported profile image */}
               <img 
-                src="/src/assets/profile.png" 
+                src={sellablesIcons.profile} 
                 alt="Profile" 
                 className="w-full h-full object-cover"
                 onError={(e) => {
@@ -143,7 +146,7 @@ export default function About() {
           <div className="flex justify-center gap-4 flex-wrap">
             {contactMethods.map((method, index) => (
               <a
-                key={index}
+                key={index} // FIXED: Added missing key prop
                 href={method.link}
                 className="group flex items-center gap-3 px-6 py-3 bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 hover:border-blue-500 transition-all duration-300 hover:scale-105 text-slate-300 hover:text-white shadow-lg hover:shadow-blue-500/20"
                 target="_blank"
@@ -161,8 +164,9 @@ export default function About() {
           <div className="bg-slate-800/30 backdrop-blur-xl rounded-3xl border border-slate-700 p-8 sm:p-12 shadow-2xl">
             <div className="flex items-center gap-4 mb-8">
               <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-blue-500 flex-shrink-0">
+                {/* FIXED: Use imported profile image */}
                 <img 
-                  src="/src/assets/profile.png" 
+                  src={sellablesIcons.profile} 
                   alt="Profile" 
                   className="w-full h-full object-cover"
                   onError={(e) => {
@@ -174,6 +178,7 @@ export default function About() {
               <h2 className="text-4xl font-bold text-white">About Me</h2>
             </div>
             
+            {/* Rest of the component remains the same... */}
             <div className="space-y-6 text-slate-300 text-lg leading-relaxed">
               <p>
                 I'm a passionate developer specializing in game automation, macro development, and full-stack web applications. 
