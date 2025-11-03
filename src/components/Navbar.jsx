@@ -9,7 +9,7 @@ export default function Navbar() {
 
   const isActive = (path) => location.pathname === path;
 
-return (
+  return (
     <nav className="bg-white shadow-md sticky top-0 z-50 border-b border-slate-200 animate-slideDown">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-20">
@@ -18,7 +18,7 @@ return (
             <Link to="/" className="flex items-center gap-3 group">
               <div className="w-16 h-16 bg-white rounded-2xl shadow-lg border border-slate-200 flex items-center justify-center group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 group-hover:rotate-3">
                 <img 
-                  src="/src/assets/calculator-nobg.png" 
+                  src={sellablesIcons.calculator} 
                   alt="Calculator Icon"
                   className="w-30 h-15 transition-transform duration-300 group-hover:scale-110"
                   onError={(e) => {
@@ -61,7 +61,7 @@ return (
             >
               <div className="w-5 h-5 flex items-center justify-center">
                 <img 
-                  src="/src/assets/calculator-nobg.png" 
+                  src={sellablesIcons.calculator} 
                   alt="Calculator"
                   className="w-4 h-4 transition-transform duration-300 group-hover:rotate-12"
                   onError={(e) => {
@@ -143,7 +143,7 @@ return (
           >
             <div className="w-5 h-5 flex items-center justify-center">
               <img 
-                src="/src/assets/calculator-nobg.png" 
+                src={sellablesIcons.calculator} 
                 alt="Calculator"
                 className="w-4 h-4"
                 onError={(e) => {
