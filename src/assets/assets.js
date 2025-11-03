@@ -27,6 +27,17 @@ import rubyNobg from './ruby-nobg.png';
 import sapphireNobg from './sapphire-nobg.png';
 import emeraldNobg from './emerald-nobg.png';
 import calculatorNobg from './calculator-nobg.png';
+import success1 from './success1.png';
+import success2 from './success2.png'
+import success3 from './success3.png';
+import success4 from './success4.png';
+import success5 from './success5.png';
+import success6 from './success6.png';
+import success7 from './success7.png';
+import success8 from './success8.png';
+import success9 from './success9.png';
+import profile from './profile.png';
+
 
 // Export all icons as an object
 export const sellablesIcons = {
@@ -55,7 +66,20 @@ export const sellablesIcons = {
   ruby: rubyNobg,
   sapphire: sapphireNobg,
   emerald: emeraldNobg,
-  calculator: calculatorNobg
+  calculator: calculatorNobg,
+  successImages: {
+    1: success1,
+    2: success2,
+    3: success3,
+    4: success4,
+    5: success5,
+    6: success6,
+    7: success7,
+    8: success8,
+    9: success9
+  },
+  profile: profile
+
 };
 
 // Export individual icons
@@ -85,7 +109,17 @@ export {
   rubyNobg,
   sapphireNobg,
   emeraldNobg,
-  calculatorNobg
+  calculatorNobg,
+  success1,
+  success2,
+  success3,
+  success4,
+  success5,
+  success6,
+  success7,
+  success8,
+  success9,
+  profile
 };
 
 // Default export
