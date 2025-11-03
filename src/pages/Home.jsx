@@ -171,7 +171,7 @@ export default function Home() {
         <div className="text-center py-8 border-t border-gray-200 animate-fadeInUp animation-delay-2000">
           <p className="text-gray-600 mb-4 text-lg">Created with Love for the GraalOnline Era community</p>
           <a 
-            href="https://discord.com/users/YOUR_DISCORD_ID" 
+            href="https://discord.com/users/itzmekramogs" 
             target="_blank" 
             rel="noopener noreferrer"
             className="inline-flex items-center gap-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-8 rounded-xl transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 transform"
