@@ -1119,7 +1119,7 @@ export default function CalculatorPage() {
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-lg border border-blue-200 mb-6 hover:scale-110 hover:rotate-3 transition-all duration-300">
             <img 
-              src="/src/assets/calculator-nobg.png" 
+              src={sellablesIcons.calculator} 
               alt="Calculator Icon"
               className="w-40 h-15"
               onError={(e) => {
