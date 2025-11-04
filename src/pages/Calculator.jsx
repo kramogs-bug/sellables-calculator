@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, ChevronDown, Plus, Minus, RotateCcw, ArrowRightLeft, ShoppingCart, Coins } from 'lucide-react';
+import { DollarSign, ChevronDown, Plus, Minus, Sparkles, RotateCcw, ArrowRightLeft, ShoppingCart, Coins } from 'lucide-react';
 
 // Import icons from assets.js
 import { sellablesIcons } from "../assets/assets.js";
@@ -46,40 +46,65 @@ const evaluateExpression = (expression) => {
   
   const expr = String(expression).replace(/\s+/g, '');
   
+  // Allow any input during typing, only validate when finalizing
   if (expr === '') return { value: 0, isValid: true };
   
   try {
+    // More permissive evaluation - allow any expression
     const result = new Function(`return ${expr}`)();
     const finalValue = Math.max(0, Math.floor(Number(result))) || 0;
     return { value: finalValue, isValid: true };
   } catch (error) {
+    // Return current value as 0 but don't mark as invalid during typing
     return { value: 0, isValid: true };
   }
 };
 
 // Tro to Gralats Converter Component
-function TroToGralatsConverter({ onBack, initialData }) {
-  const [troQuantities, setTroQuantities] = useState(initialData?.troQuantities || {});
+function TroToGralatsConverter({ onBack }) {
+  const [troQuantities, setTroQuantities] = useState(() => {
+    const saved = localStorage.getItem('graalTroCalculatorData');
+    return saved ? JSON.parse(saved) : {};
+  });
+  
   const [troInputValues, setTroInputValues] = useState(() => {
-    const quantities = initialData?.troQuantities || {};
-    const inputs = {};
-    Object.keys(quantities).forEach(key => {
-      inputs[key] = quantities[key] > 0 ? quantities[key].toString() : '';
-    });
-    return inputs;
+    const saved = localStorage.getItem('graalTroCalculatorData');
+    if (saved) {
+      const quantities = JSON.parse(saved);
+      const inputs = {};
+      Object.keys(quantities).forEach(key => {
+        inputs[key] = quantities[key] > 0 ? quantities[key].toString() : '';
+      });
+      return inputs;
+    }
+    return {};
   });
 
-  const [troRatio, setTroRatio] = useState(initialData?.troRatio || 3.8);
-  const [availableTro, setAvailableTro] = useState(initialData?.availableTro || 0);
-  const [availableTroInput, setAvailableTroInput] = useState(initialData?.availableTro ? initialData.availableTro.toString() : '');
+  const [troRatio, setTroRatio] = useState(() => {
+    const saved = localStorage.getItem('graalTroRatio');
+    return saved ? parseFloat(saved) : 3.8;
+  });
 
-  const [expandedCategories, setExpandedCategories] = useState(initialData?.troExpandedCategories || {
-    shells: true,
-    trash: true,
-    crabshells: true,
-    minerals: true,
-    rareminerals: true,
-    flowers: true
+  const [availableTro, setAvailableTro] = useState(() => {
+    const saved = localStorage.getItem('graalAvailableTro');
+    return saved ? parseFloat(saved) : 0;
+  });
+
+  const [availableTroInput, setAvailableTroInput] = useState(() => {
+    const saved = localStorage.getItem('graalAvailableTro');
+    return saved ? saved : '';
+  });
+
+  const [expandedCategories, setExpandedCategories] = useState(() => {
+    const saved = localStorage.getItem('graalTroExpandedCategories');
+    return saved ? JSON.parse(saved) : {
+      shells: true,
+      trash: true,
+      crabshells: true,
+      minerals: true,
+      rareminerals: true,
+      flowers: true
+    };
   });
 
   const [isScrolled, setIsScrolled] = useState(false);
@@ -118,6 +143,7 @@ function TroToGralatsConverter({ onBack, initialData }) {
     }
   };
 
+  // Check if mobile and track scroll
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -137,6 +163,22 @@ function TroToGralatsConverter({ onBack, initialData }) {
     };
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem('graalTroCalculatorData', JSON.stringify(troQuantities));
+  }, [troQuantities]);
+
+  useEffect(() => {
+    localStorage.setItem('graalTroRatio', troRatio.toString());
+  }, [troRatio]);
+
+  useEffect(() => {
+    localStorage.setItem('graalAvailableTro', availableTro.toString());
+  }, [availableTro]);
+
+  useEffect(() => {
+    localStorage.setItem('graalTroExpandedCategories', JSON.stringify(expandedCategories));
+  }, [expandedCategories]);
+
   const toggleCategory = (category) => {
     setExpandedCategories(prev => ({
       ...prev,
@@ -144,6 +186,7 @@ function TroToGralatsConverter({ onBack, initialData }) {
     }));
   };
 
+  // Calculate maximum affordable quantity for an item
   const calculateMaxAffordableQuantity = (itemPrice) => {
     if (itemPrice <= 0) return 0;
     
@@ -159,6 +202,7 @@ function TroToGralatsConverter({ onBack, initialData }) {
   };
 
   const handleTroQuantityChange = (itemName, value, itemPrice) => {
+    // Don't allow changes if no available Tro
     if (availableTro <= 0 && value !== '' && value !== '0') {
       return;
     }
@@ -176,9 +220,10 @@ function TroToGralatsConverter({ onBack, initialData }) {
     } else {
       const { value: evaluatedValue } = evaluateExpression(value);
       
+      // Check if the new quantity is affordable
       const newTroCost = (itemPrice * evaluatedValue) / troRatio;
       const currentTotalCost = calculateTotalTroCost();
-      const currentItemCost = (itemPrice * (troQuantities[itemName] || 0)) / troRatio;
+      const currentItemCost = (itemPrice * (troQuantities[item.name] || 0)) / troRatio;
       const newTotalCost = currentTotalCost - currentItemCost + newTroCost;
       
       if (newTotalCost <= availableTro) {
@@ -187,6 +232,7 @@ function TroToGralatsConverter({ onBack, initialData }) {
           [itemName]: evaluatedValue
         }));
       } else {
+        // If not affordable, set to maximum affordable quantity
         const maxAffordable = calculateMaxAffordableQuantity(itemPrice);
         setTroQuantities(prev => ({
           ...prev,
@@ -206,6 +252,7 @@ function TroToGralatsConverter({ onBack, initialData }) {
 
     const { value: evaluatedValue } = evaluateExpression(value);
     
+    // Check affordability
     const newTroCost = (itemPrice * evaluatedValue) / troRatio;
     const currentTotalCost = calculateTotalTroCost();
     const currentItemCost = (itemPrice * (troQuantities[itemName] || 0)) / troRatio;
@@ -221,6 +268,7 @@ function TroToGralatsConverter({ onBack, initialData }) {
         [itemName]: evaluatedValue
       }));
     } else {
+      // Set to maximum affordable
       const maxAffordable = calculateMaxAffordableQuantity(itemPrice);
       setTroInputValues(prev => ({
         ...prev,
@@ -317,6 +365,7 @@ function TroToGralatsConverter({ onBack, initialData }) {
     let total = 0;
     Object.entries(sellableItems).forEach(([category, items]) => {
       items.forEach(item => {
+        // Calculate: (item price * quantity) / ratio = Tro cost
         const gralatsValue = item.price * (troQuantities[item.name] || 0);
         const troCost = gralatsValue / troRatio;
         total += troCost;
@@ -345,6 +394,8 @@ function TroToGralatsConverter({ onBack, initialData }) {
     setTroInputValues({});
     setAvailableTro(0);
     setAvailableTroInput('');
+    localStorage.removeItem('graalTroCalculatorData');
+    localStorage.removeItem('graalAvailableTro');
   };
 
   const handleTroRatioChange = (value) => {
@@ -375,6 +426,7 @@ function TroToGralatsConverter({ onBack, initialData }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 py-8 px-4">
       <div className="max-w-4xl mx-auto">
+        {/* Header */}
         <div className="text-center mb-8">
           <button
             onClick={onBack}
@@ -392,6 +444,7 @@ function TroToGralatsConverter({ onBack, initialData }) {
           <p className="text-lg text-slate-600 font-medium">Calculate Gralats needed for Tro purchases</p>
         </div>
 
+        {/* Floating Summary Bar for Mobile */}
         {(isMobile && isScrolled) && (
           <div className="fixed top-4 left-4 right-4 z-50 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl shadow-2xl p-4 border-2 border-amber-300">
             <div className="flex items-center justify-between">
@@ -413,6 +466,7 @@ function TroToGralatsConverter({ onBack, initialData }) {
           </div>
         )}
 
+        {/* Available Tro Input */}
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 sm:p-8 mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-4">
@@ -457,7 +511,9 @@ function TroToGralatsConverter({ onBack, initialData }) {
           </div>
         </div>
 
+        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Total Tro Cost */}
           <div className="bg-gradient-to-r from-amber-400 via-yellow-500 to-orange-500 rounded-2xl shadow-lg border-2 border-amber-300 p-6">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
@@ -477,6 +533,7 @@ function TroToGralatsConverter({ onBack, initialData }) {
             </div>
           </div>
 
+          {/* Gralats Needed */}
           <div className="bg-gradient-to-r from-blue-400 via-blue-500 to-indigo-500 rounded-2xl shadow-lg border-2 border-blue-300 p-6">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
@@ -496,6 +553,7 @@ function TroToGralatsConverter({ onBack, initialData }) {
             </div>
           </div>
 
+          {/* Remaining Tro */}
           <div className={`rounded-2xl shadow-lg border-2 p-6 ${
             hasEnoughTro 
               ? 'bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500 border-green-300' 
@@ -520,6 +578,7 @@ function TroToGralatsConverter({ onBack, initialData }) {
           </div>
         </div>
 
+        {/* Ratio Control */}
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 sm:p-8 mb-8">
           <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-200">
             <label className="block text-sm font-semibold text-slate-600 mb-4">
@@ -568,6 +627,7 @@ function TroToGralatsConverter({ onBack, initialData }) {
           </div>
         </div>
 
+        {/* Categories */}
         <div className="space-y-4 mb-20">
           {Object.entries(categories).map(([categoryKey, category]) => {
             const categoryTotal = sellableItems[categoryKey].reduce((sum, item) => {
@@ -717,26 +777,60 @@ function TroToGralatsConverter({ onBack, initialData }) {
 
 // Main Calculator Component
 export default function CalculatorPage() {
-  const [currentPage, setCurrentPage] = useState('main');
-  const [quantities, setQuantities] = useState({});
-  const [expandedCategories, setExpandedCategories] = useState({
-    shells: true,
-    trash: true,
-    crabshells: true,
-    minerals: true,
-    rareminerals: true,
-    flowers: true
+  const [currentPage, setCurrentPage] = useState(() => {
+    const saved = localStorage.getItem('graalCurrentPage');
+    return saved ? saved : 'main'; // 'main' or 'tro-converter'
+  });
+
+  const [quantities, setQuantities] = useState(() => {
+    const saved = localStorage.getItem('graalCalculatorData');
+    return saved ? JSON.parse(saved) : {};
+  });
+  
+  const [expandedCategories, setExpandedCategories] = useState(() => {
+    const saved = localStorage.getItem('graalExpandedCategories');
+    return saved ? JSON.parse(saved) : {
+      shells: true,
+      trash: true,
+      crabshells: true,
+      minerals: true,
+      rareminerals: true,
+      flowers: true
+    };
   });
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 80 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [troRatio, setTroRatio] = useState(3.8);
-  const [showTroConversion, setShowTroConversion] = useState(false);
-  const [inputValues, setInputValues] = useState({});
+  const [troRatio, setTroRatio] = useState(() => {
+    const saved = localStorage.getItem('graalTroRatio');
+    return saved ? parseFloat(saved) : 3.8;
+  });
+  const [showTroConversion, setShowTroConversion] = useState(() => {
+    const saved = localStorage.getItem('graalShowTroConversion');
+    return saved ? JSON.parse(saved) : false;
+  });
+  const [inputValues, setInputValues] = useState(() => {
+    const saved = localStorage.getItem('graalCalculatorData');
+    if (saved) {
+      const quantities = JSON.parse(saved);
+      const inputs = {};
+      Object.keys(quantities).forEach(key => {
+        inputs[key] = quantities[key] > 0 ? quantities[key].toString() : '';
+      });
+      return inputs;
+    }
+    return {};
+  });
   const [isMobile, setIsMobile] = useState(false);
 
+  // Save current page to localStorage
+  useEffect(() => {
+    localStorage.setItem('graalCurrentPage', currentPage);
+  }, [currentPage]);
+
+  // Check if mobile and track scroll
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -756,15 +850,27 @@ export default function CalculatorPage() {
     };
   }, []);
 
+  // Load saved position from localStorage
   useEffect(() => {
-    if (window.innerWidth < 768) {
-      setPosition({
-        x: window.innerWidth / 2 - 150,
-        y: 20
-      });
+    const savedPosition = localStorage.getItem('graalTotalPosition');
+    if (savedPosition) {
+      setPosition(JSON.parse(savedPosition));
+    } else {
+      if (window.innerWidth < 768) {
+        setPosition({
+          x: window.innerWidth / 2 - 150,
+          y: 20
+        });
+      }
     }
   }, []);
 
+  // Save position to localStorage
+  useEffect(() => {
+    localStorage.setItem('graalTotalPosition', JSON.stringify(position));
+  }, [position]);
+
+  // Handle drag
   const handleMouseDown = (e) => {
     setIsDragging(true);
     setDragOffset({
@@ -820,6 +926,28 @@ export default function CalculatorPage() {
       window.removeEventListener('touchend', handleMouseUp);
     };
   }, [isDragging, dragOffset]);
+
+  // Save to localStorage
+  useEffect(() => {
+    localStorage.setItem('graalCalculatorData', JSON.stringify(quantities));
+  }, [quantities]);
+
+  useEffect(() => {
+    localStorage.setItem('graalExpandedCategories', JSON.stringify(expandedCategories));
+  }, [expandedCategories]);
+
+  useEffect(() => {
+    localStorage.setItem('graalTroRatio', troRatio.toString());
+  }, [troRatio]);
+
+  useEffect(() => {
+    localStorage.setItem('graalShowTroConversion', JSON.stringify(showTroConversion));
+  }, [showTroConversion]);
+
+  // Save input values to localStorage
+  useEffect(() => {
+    localStorage.setItem('graalInputValues', JSON.stringify(inputValues));
+  }, [inputValues]);
 
   const toggleCategory = (category) => {
     setExpandedCategories(prev => ({
@@ -916,6 +1044,8 @@ export default function CalculatorPage() {
   const resetAll = () => {
     setQuantities({});
     setInputValues({});
+    localStorage.removeItem('graalCalculatorData');
+    localStorage.removeItem('graalInputValues');
   };
 
   const handleTroRatioChange = (value) => {
@@ -977,13 +1107,26 @@ export default function CalculatorPage() {
 
   const total = calculateTotal();
 
+  // Show Tro Converter if enabled
+  if (currentPage === 'tro-converter') {
+    return <TroToGralatsConverter onBack={() => setCurrentPage('main')} />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 py-8 px-4">
       <div className="max-w-4xl mx-auto">
+        {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-lg border border-blue-200 mb-6 hover:scale-110 hover:rotate-3 transition-all duration-300">
-            <DollarSign className="text-blue-600" size={32} />
+            <img 
+              src="/src/assets/calculator-nobg.png" 
+              alt="Calculator Icon"
+              className="w-40 h-15"
+              onError={(e) => {
+                e.target.src = sellablesIcons.star;
+                e.target.className = "w-8 h-8";
+              }}
+            />
           </div>
           <h1 className="text-4xl font-bold text-slate-800 mb-3">
             Sellables Calculator
@@ -991,6 +1134,7 @@ export default function CalculatorPage() {
           <p className="text-lg text-slate-600 font-medium">Track your Gralats in real-time</p>
         </div>
 
+        {/* Single Draggable Total Bar */}
         <div 
           className={`fixed z-50 transition-opacity duration-500 ${
             (isMobile || isScrolled) ? 'opacity-100' : 'opacity-0 pointer-events-none'
@@ -1054,6 +1198,7 @@ export default function CalculatorPage() {
                 </div>
               </div>
               
+              {/* Tro Conversion Display */}
               {showTroConversion && (
                 <div className="pt-3 border-t border-white/20">
                   <div className="space-y-3">
@@ -1119,6 +1264,7 @@ export default function CalculatorPage() {
                       </p>
                     </div>
 
+                    {/* Tro to Gralats Button */}
                     <button
                       onClick={() => setCurrentPage('tro-converter')}
                       onMouseDown={(e) => e.stopPropagation()}
@@ -1141,6 +1287,7 @@ export default function CalculatorPage() {
           </div>
         </div>
 
+        {/* Original Total Display */}
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 sm:p-8 mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-4">
@@ -1186,6 +1333,7 @@ export default function CalculatorPage() {
             </div>
           </div>
 
+          {/* Collapsible Tro Converter */}
           {showTroConversion && (
             <div className="pt-6 border-t border-slate-200">
               <div className="flex flex-col gap-6">
@@ -1221,6 +1369,7 @@ export default function CalculatorPage() {
                     </div>
                   </div>
 
+                  {/* Gralats to Tro Display */}
                   <div className="lg:w-80 bg-gradient-to-r from-amber-400 via-yellow-500 to-orange-500 rounded-xl p-4 sm:p-6 shadow-lg border-2 border-amber-300">
                     <div className="flex items-center gap-4 mb-3">
                       <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
@@ -1241,6 +1390,7 @@ export default function CalculatorPage() {
                   </div>
                 </div>
 
+                {/* Tro to Gralats Button */}
                 <div className="flex justify-center">
                   <button
                     onClick={() => setCurrentPage('tro-converter')}
@@ -1255,6 +1405,7 @@ export default function CalculatorPage() {
           )}
         </div>
 
+        {/* Categories */}
         <div className="space-y-4 mb-20">
           {Object.entries(categories).map(([categoryKey, category]) => {
             const categoryTotal = sellableItems[categoryKey].reduce((sum, item) => 
@@ -1371,6 +1522,7 @@ export default function CalculatorPage() {
           })}
         </div>
 
+        {/* Footer */}
         <div className="text-center py-8 text-slate-500">
           <p className="text-sm">Made with ❤️ for Graal players</p>
         </div>
