@@ -1454,6 +1454,13 @@ export default function CalculatorPage() {
                               </button>
                             </div>
 
+                            {/* Red message for expression input */}
+                            <div className="mt-2">
+                              <p className="text-xs text-red-500 text-center">
+                                You can input expressions like 200+400 for items with the same price
+                              </p>
+                            </div>
+
                             <div className="mt-3 pt-3 border-t border-slate-200">
                               <div className="flex items-center justify-between text-xs sm:text-sm">
                                 <span className="text-slate-500 font-medium">Subtotal:</span>
