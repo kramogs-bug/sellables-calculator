@@ -2,17 +2,170 @@
 export const evaluateExpression = (expression) => {
   if (!expression || expression === '') return { value: 0, isValid: true };
   
-  const expr = String(expression).replace(/\s+/g, '');
+  // Remove commas and spaces before evaluation
+  const expr = String(expression).replace(/\s+/g, '').replace(/,/g, '');
   
   if (expr === '') return { value: 0, isValid: true };
   
+  // Check if it's a simple number (not an expression)
+  const isSimpleNumber = /^-?\d*\.?\d+$/.test(expr);
+  
   try {
-    const result = new Function(`return ${expr}`)();
+    let result;
+    if (isSimpleNumber) {
+      // For simple numbers, parse directly
+      result = parseFloat(expr);
+    } else {
+      // For expressions, evaluate
+      result = new Function(`return ${expr}`)();
+    }
+    
+    // Handle NaN, Infinity, and other invalid results
+    if (isNaN(result) || !isFinite(result)) {
+      return { value: 0, isValid: false };
+    }
+    
     const finalValue = Math.max(0, Math.floor(Number(result))) || 0;
     return { value: finalValue, isValid: true };
   } catch (error) {
-    return { value: 0, isValid: true };
+    return { value: 0, isValid: false };
   }
+};
+
+// Format number with commas (only for display, not for expressions)
+export const formatNumberWithCommas = (number) => {
+  if (number === null || number === undefined || number === '') return '';
+  
+  // If it contains operators, don't add commas to avoid breaking expressions
+  const str = number.toString();
+  if (/[+\-*/().]/.test(str)) {
+    return str; // Return expression as-is without commas
+  }
+  
+  try {
+    const num = typeof number === 'string' ? number.replace(/,/g, '') : number;
+    const parsed = parseFloat(num);
+    if (isNaN(parsed)) return str; // Return original if not a valid number
+    return parsed.toLocaleString('en-US');
+  } catch (error) {
+    return str; // Return original on error
+  }
+};
+
+// Parse number by removing commas
+export const parseNumberWithCommas = (formattedNumber) => {
+  if (!formattedNumber) return '';
+  return formattedNumber.toString().replace(/,/g, '');
+};
+
+// Check if input is an expression (contains operators)
+export const isExpression = (input) => {
+  if (!input) return false;
+  const cleanInput = input.toString().replace(/,/g, '').replace(/\s+/g, '');
+  return /[+\-*/().]/.test(cleanInput);
+};
+
+// Handle quantity changes with comma formatting
+export const handleQuantityChange = (itemName, value, quantities, setQuantities, inputValues, setInputValues) => {
+  // For expressions, don't add commas to avoid breaking the expression
+  let formattedValue;
+  if (isExpression(value)) {
+    formattedValue = value; // Keep expression as-is
+  } else {
+    formattedValue = formatNumberWithCommas(value);
+  }
+  
+  setInputValues(prev => ({
+    ...prev,
+    [itemName]: formattedValue
+  }));
+  
+  if (value === '' || value === null || value === undefined) {
+    setQuantities(prev => ({
+      ...prev,
+      [itemName]: 0
+    }));
+  } else {
+    // Remove commas before evaluation
+    const valueWithoutCommas = parseNumberWithCommas(value);
+    const { value: evaluatedValue, isValid } = evaluateExpression(valueWithoutCommas);
+    
+    if (isValid) {
+      setQuantities(prev => ({
+        ...prev,
+        [itemName]: evaluatedValue
+      }));
+    } else {
+      // If expression is invalid, keep the current quantity but still update input
+      setQuantities(prev => ({
+        ...prev,
+        [itemName]: prev[itemName] || 0
+      }));
+    }
+  }
+};
+
+// Handle quantity blur with comma formatting
+export const handleQuantityBlur = (itemName, inputValues, setInputValues, quantities, setQuantities) => {
+  const value = inputValues[itemName] || '';
+  if (value === '') return;
+
+  // Remove commas before evaluation
+  const valueWithoutCommas = parseNumberWithCommas(value);
+  const { value: evaluatedValue, isValid } = evaluateExpression(valueWithoutCommas);
+  
+  if (isValid && evaluatedValue > 0) {
+    // Format the final value with commas (only if it's a simple number)
+    const formattedValue = formatNumberWithCommas(evaluatedValue.toString());
+    setInputValues(prev => ({
+      ...prev,
+      [itemName]: formattedValue
+    }));
+    setQuantities(prev => ({
+      ...prev,
+      [itemName]: evaluatedValue
+    }));
+  } else if (!isValid) {
+    // If expression is invalid, revert to current quantity
+    const currentQty = quantities[itemName] || 0;
+    const formattedValue = currentQty > 0 ? formatNumberWithCommas(currentQty.toString()) : '';
+    setInputValues(prev => ({
+      ...prev,
+      [itemName]: formattedValue
+    }));
+  }
+};
+
+// Increment quantity with comma formatting
+export const incrementQuantity = (itemName, quantities, setQuantities, inputValues, setInputValues) => {
+  const currentValue = quantities[itemName] || 0;
+  const newValue = currentValue + 1;
+  setQuantities(prev => ({
+    ...prev,
+    [itemName]: newValue
+  }));
+  // Format the new value with commas
+  const formattedValue = formatNumberWithCommas(newValue.toString());
+  setInputValues(prev => ({
+    ...prev,
+    [itemName]: formattedValue
+  }));
+};
+
+// Decrement quantity with comma formatting
+export const decrementQuantity = (itemName, quantities, setQuantities, inputValues, setInputValues) => {
+  const currentValue = quantities[itemName] || 0;
+  const newValue = Math.max(0, currentValue - 1);
+  setQuantities(prev => ({
+    ...prev,
+    [itemName]: newValue
+  }));
+  // Format the new value with commas (or empty string if 0)
+  const formattedValue = newValue > 0 ? formatNumberWithCommas(newValue.toString()) : '';
+  setInputValues(prev => ({
+    ...prev,
+    [itemName]: formattedValue
+  }));
 };
 
 // Calculate total value from quantities and items
@@ -55,74 +208,6 @@ export const calculateRatioDifference = (currentRatio, originalRatio, total) => 
     isIncrease: difference > 0,
     hasChanged: Math.abs(currentRatio - originalRatio) > 0.01
   };
-};
-
-// Handle quantity changes
-export const handleQuantityChange = (itemName, value, quantities, setQuantities, inputValues, setInputValues) => {
-  setInputValues(prev => ({
-    ...prev,
-    [itemName]: value
-  }));
-  
-  if (value === '' || value === null || value === undefined) {
-    setQuantities(prev => ({
-      ...prev,
-      [itemName]: 0
-    }));
-  } else {
-    const { value: evaluatedValue } = evaluateExpression(value);
-    setQuantities(prev => ({
-      ...prev,
-      [itemName]: evaluatedValue
-    }));
-  }
-};
-
-// Handle quantity blur
-export const handleQuantityBlur = (itemName, inputValues, setInputValues, quantities, setQuantities) => {
-  const value = inputValues[itemName] || '';
-  if (value === '') return;
-
-  const { value: evaluatedValue } = evaluateExpression(value);
-  
-  if (evaluatedValue > 0) {
-    setInputValues(prev => ({
-      ...prev,
-      [itemName]: evaluatedValue.toString()
-    }));
-    setQuantities(prev => ({
-      ...prev,
-      [itemName]: evaluatedValue
-    }));
-  }
-};
-
-// Increment quantity
-export const incrementQuantity = (itemName, quantities, setQuantities, inputValues, setInputValues) => {
-  const currentValue = quantities[itemName] || 0;
-  const newValue = currentValue + 1;
-  setQuantities(prev => ({
-    ...prev,
-    [itemName]: newValue
-  }));
-  setInputValues(prev => ({
-    ...prev,
-    [itemName]: newValue.toString()
-  }));
-};
-
-// Decrement quantity
-export const decrementQuantity = (itemName, quantities, setQuantities, inputValues, setInputValues) => {
-  const currentValue = quantities[itemName] || 0;
-  const newValue = Math.max(0, currentValue - 1);
-  setQuantities(prev => ({
-    ...prev,
-    [itemName]: newValue
-  }));
-  setInputValues(prev => ({
-    ...prev,
-    [itemName]: newValue > 0 ? newValue.toString() : ''
-  }));
 };
 
 // Handle Tro ratio change
