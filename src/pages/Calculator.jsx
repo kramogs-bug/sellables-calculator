@@ -4,6 +4,35 @@ import { DollarSign, ChevronDown, Plus, Minus, Sparkles, RotateCcw, ArrowRightLe
 // Import icons from assets.js
 import { sellablesIcons } from "../assets/assets.js";
 
+// Import backend functions
+import {
+  evaluateExpression,
+  calculateTotal,
+  calculateCategoryTotals,
+  calculateTroValue,
+  calculateRatioDifference,
+  handleQuantityChange,
+  handleQuantityBlur,
+  incrementQuantity,
+  decrementQuantity,
+  handleTroRatioChange,
+  incrementTroRatio,
+  decrementTroRatio,
+  resetAll,
+  resetRatioToOriginal,
+  initializeState,
+  saveState,
+  handleDragStart,
+  handleTouchStart,
+  handleDragMove,
+  handleTouchMove,
+  handleDragEnd,
+  calculateMaxAffordableQuantity,
+  calculateTotalTroCost,
+  calculateGralatsNeeded,
+  calculateRemainingTro
+} from './calculatorBackend.js';
+
 const sellableItems = {
   shells: [
     { name: "Tro", price: 3, icon: sellablesIcons.tro },
@@ -11,6 +40,9 @@ const sellableItems = {
     { name: "Sand Dollar", price: 5, icon: sellablesIcons.sandDollar },
     { name: "Scallop", price: 5, icon: sellablesIcons.scallop },
     { name: "Starfish", price: 7, icon: sellablesIcons.star },
+  ],
+  mushrooms: [
+    { name: "Mushroom", price: 5, icon: sellablesIcons.mushrooms }
   ],
   trash: [
     { name: "Bottle", price: 5, icon: sellablesIcons.bottle },
@@ -37,25 +69,9 @@ const sellableItems = {
     { name: "Carnation", price: 0.5, icon: sellablesIcons.carnation, unit: "flowers", displayPrice: "10pcs = 5 Gralats" },
     { name: "Aster", price: 0.6, icon: sellablesIcons.aster, unit: "flowers", displayPrice: "10pcs = 6 Gralats" },
     { name: "Rose", price: 0.7, icon: sellablesIcons.rose, unit: "flowers", displayPrice: "10pcs = 7 Gralats" },
-  ],
+  ]
 };
 
-// Function to safely evaluate mathematical expressions and validate input
-const evaluateExpression = (expression) => {
-  if (!expression || expression === '') return { value: 0, isValid: true };
-  
-  const expr = String(expression).replace(/\s+/g, '');
-  
-  if (expr === '') return { value: 0, isValid: true };
-  
-  try {
-    const result = new Function(`return ${expr}`)();
-    const finalValue = Math.max(0, Math.floor(Number(result))) || 0;
-    return { value: finalValue, isValid: true };
-  } catch (error) {
-    return { value: 0, isValid: true };
-  }
-};
 
 // Tro to Gralats Converter Component
 function TroToGralatsConverter({ onBack }) {
@@ -96,6 +112,7 @@ function TroToGralatsConverter({ onBack }) {
     const saved = localStorage.getItem('graalTroExpandedCategories');
     return saved ? JSON.parse(saved) : {
       shells: true,
+      mushrooms: true,
       trash: true,
       crabshells: true,
       minerals: true,
@@ -112,6 +129,11 @@ function TroToGralatsConverter({ onBack }) {
       name: "Shells", 
       icon: sellablesIcons.shell,
       bgColor: "bg-blue-500/10",
+    },
+    mushrooms: { 
+      name: "Mushrooms", 
+      icon: sellablesIcons.mushrooms,
+      bgColor: "bg-red-500/10",
     },
     trash: { 
       name: "Trash Items", 
@@ -183,23 +205,7 @@ function TroToGralatsConverter({ onBack }) {
     }));
   };
 
-  // Calculate maximum affordable quantity for an item
-  const calculateMaxAffordableQuantity = (itemPrice) => {
-    if (itemPrice <= 0) return 0;
-    
-    const currentTotalCost = calculateTotalTroCost();
-    const remainingBeforeThisItem = availableTro - currentTotalCost;
-    
-    if (remainingBeforeThisItem <= 0) return 0;
-    
-    const troCostPerItem = itemPrice / troRatio;
-    const maxAffordable = Math.floor(remainingBeforeThisItem / troCostPerItem);
-    
-    return Math.max(0, maxAffordable);
-  };
-
   const handleTroQuantityChange = (itemName, value, itemPrice) => {
-    // Don't allow changes if no available Tro
     if (availableTro <= 0 && value !== '' && value !== '0') {
       return;
     }
@@ -217,9 +223,8 @@ function TroToGralatsConverter({ onBack }) {
     } else {
       const { value: evaluatedValue } = evaluateExpression(value);
       
-      // Check if the new quantity is affordable
       const newTroCost = (itemPrice * evaluatedValue) / troRatio;
-      const currentTotalCost = calculateTotalTroCost();
+      const currentTotalCost = calculateTotalTroCost(troQuantities, sellableItems, troRatio);
       const currentItemCost = (itemPrice * (troQuantities[item.name] || 0)) / troRatio;
       const newTotalCost = currentTotalCost - currentItemCost + newTroCost;
       
@@ -229,8 +234,14 @@ function TroToGralatsConverter({ onBack }) {
           [itemName]: evaluatedValue
         }));
       } else {
-        // If not affordable, set to maximum affordable quantity
-        const maxAffordable = calculateMaxAffordableQuantity(itemPrice);
+        const maxAffordable = calculateMaxAffordableQuantity(
+          itemPrice, 
+          availableTro, 
+          troRatio, 
+          currentTotalCost, 
+          currentItemCost, 
+          troQuantities[item.name] || 0
+        );
         setTroQuantities(prev => ({
           ...prev,
           [itemName]: maxAffordable
@@ -249,9 +260,8 @@ function TroToGralatsConverter({ onBack }) {
 
     const { value: evaluatedValue } = evaluateExpression(value);
     
-    // Check affordability
     const newTroCost = (itemPrice * evaluatedValue) / troRatio;
-    const currentTotalCost = calculateTotalTroCost();
+    const currentTotalCost = calculateTotalTroCost(troQuantities, sellableItems, troRatio);
     const currentItemCost = (itemPrice * (troQuantities[itemName] || 0)) / troRatio;
     const newTotalCost = currentTotalCost - currentItemCost + newTroCost;
     
@@ -265,8 +275,14 @@ function TroToGralatsConverter({ onBack }) {
         [itemName]: evaluatedValue
       }));
     } else {
-      // Set to maximum affordable
-      const maxAffordable = calculateMaxAffordableQuantity(itemPrice);
+      const maxAffordable = calculateMaxAffordableQuantity(
+        itemPrice, 
+        availableTro, 
+        troRatio, 
+        currentTotalCost, 
+        currentItemCost, 
+        troQuantities[itemName] || 0
+      );
       setTroInputValues(prev => ({
         ...prev,
         [itemName]: maxAffordable > 0 ? maxAffordable.toString() : ''
@@ -290,7 +306,7 @@ function TroToGralatsConverter({ onBack }) {
     
     const currentValue = troQuantities[itemName] || 0;
     const newTroCost = (itemPrice * (currentValue + 1)) / troRatio;
-    const currentTotalCost = calculateTotalTroCost();
+    const currentTotalCost = calculateTotalTroCost(troQuantities, sellableItems, troRatio);
     const currentItemCost = (itemPrice * currentValue) / troRatio;
     const newTotalCost = currentTotalCost - currentItemCost + newTroCost;
     
@@ -358,34 +374,6 @@ function TroToGralatsConverter({ onBack }) {
     setAvailableTroInput(newValue > 0 ? newValue.toString() : '');
   };
 
-  const calculateTotalTroCost = () => {
-    let total = 0;
-    Object.entries(sellableItems).forEach(([category, items]) => {
-      items.forEach(item => {
-        // Calculate: (item price * quantity) / ratio = Tro cost
-        const gralatsValue = item.price * (troQuantities[item.name] || 0);
-        const troCost = gralatsValue / troRatio;
-        total += troCost;
-      });
-    });
-    return total;
-  };
-
-  const calculateGralatsNeeded = () => {
-    let total = 0;
-    Object.entries(sellableItems).forEach(([category, items]) => {
-      items.forEach(item => {
-        total += item.price * (troQuantities[item.name] || 0);
-      });
-    });
-    return total.toFixed(2);
-  };
-
-  const calculateRemainingTro = () => {
-    const totalTroCost = calculateTotalTroCost();
-    return (availableTro - totalTroCost).toFixed(2);
-  };
-
   const resetTroCalculator = () => {
     setTroQuantities({});
     setTroInputValues({});
@@ -415,9 +403,9 @@ function TroToGralatsConverter({ onBack }) {
     });
   };
 
-  const totalTroCost = calculateTotalTroCost();
-  const gralatsNeeded = calculateGralatsNeeded();
-  const remainingTro = calculateRemainingTro();
+  const totalTroCost = calculateTotalTroCost(troQuantities, sellableItems, troRatio);
+  const gralatsNeeded = calculateGralatsNeeded(troQuantities, sellableItems);
+  const remainingTro = calculateRemainingTro(availableTro, totalTroCost);
   const hasEnoughTro = remainingTro >= 0;
 
   return (
@@ -439,7 +427,7 @@ function TroToGralatsConverter({ onBack }) {
             Tro to Gralats Converter
           </h1>
           <p className="text-lg text-slate-600 font-medium">Calculate Gralats needed for Tro purchases</p>
-        </div>
+        </div>s
 
         {/* Floating Summary Bar for Mobile */}
         {(isMobile && isScrolled) && (
@@ -669,7 +657,16 @@ function TroToGralatsConverter({ onBack }) {
                         const isExpression = currentInput && /[+\-*/()]/.test(currentInput);
                         const gralatsNeeded = item.price * currentQty;
                         const troCost = gralatsNeeded / troRatio;
-                        const maxAffordable = calculateMaxAffordableQuantity(item.price);
+                        const currentTotalCost = calculateTotalTroCost(troQuantities, sellableItems, troRatio);
+                        const currentItemCost = (item.price * currentQty) / troRatio;
+                        const maxAffordable = calculateMaxAffordableQuantity(
+                          item.price, 
+                          availableTro, 
+                          troRatio, 
+                          currentTotalCost, 
+                          currentItemCost, 
+                          currentQty
+                        );
                         const canAffordMore = maxAffordable > currentQty;
                         const isDisabled = availableTro <= 0;
                         
@@ -774,75 +771,35 @@ function TroToGralatsConverter({ onBack }) {
 
 // Main Calculator Component
 export default function CalculatorPage() {
-  const [currentPage, setCurrentPage] = useState(() => {
-    const saved = localStorage.getItem('graalCurrentPage');
-    return saved ? saved : 'main'; // 'main' or 'tro-converter'
-  });
-
-  const [quantities, setQuantities] = useState(() => {
-    const saved = localStorage.getItem('graalCalculatorData');
-    return saved ? JSON.parse(saved) : {};
-  });
+  // Initialize state using backend function
+  const initialState = initializeState();
   
-  const [expandedCategories, setExpandedCategories] = useState(() => {
-    const saved = localStorage.getItem('graalExpandedCategories');
-    return saved ? JSON.parse(saved) : {
-      shells: true,
-      trash: true,
-      crabshells: true,
-      minerals: true,
-      rareminerals: true,
-      flowers: true
-    };
-  });
-
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [position, setPosition] = useState({ x: 0, y: 80 });
+  const [currentPage, setCurrentPage] = useState(initialState.currentPage);
+  const [quantities, setQuantities] = useState(initialState.quantities);
+  const [expandedCategories, setExpandedCategories] = useState(initialState.expandedCategories);
+  const [troRatio, setTroRatio] = useState(initialState.troRatio);
+  const [originalRatio, setOriginalRatio] = useState(initialState.originalRatio);
+  const [showTroConversion, setShowTroConversion] = useState(initialState.showTroConversion);
+  const [inputValues, setInputValues] = useState(initialState.inputValues);
+  const [position, setPosition] = useState(initialState.position);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  
-  const [troRatio, setTroRatio] = useState(() => {
-    const saved = localStorage.getItem('graalTroRatio');
-    return saved ? parseFloat(saved) : 3.8;
-  });
-  
-  // Store the FIRST original ratio (persists until reset or page load)
-  const [originalRatio, setOriginalRatio] = useState(() => {
-    const savedOriginal = localStorage.getItem('graalOriginalTroRatio');
-    if (savedOriginal) {
-      return parseFloat(savedOriginal);
-    }
-    // If no original saved, use current ratio as original
-    const saved = localStorage.getItem('graalTroRatio');
-    const initial = saved ? parseFloat(saved) : 3.8;
-    localStorage.setItem('graalOriginalTroRatio', initial.toString());
-    return initial;
-  });
-  
-  const [showTroConversion, setShowTroConversion] = useState(() => {
-    const saved = localStorage.getItem('graalShowTroConversion');
-    return saved ? JSON.parse(saved) : false;
-  });
-  
-  const [inputValues, setInputValues] = useState(() => {
-    const saved = localStorage.getItem('graalCalculatorData');
-    if (saved) {
-      const quantities = JSON.parse(saved);
-      const inputs = {};
-      Object.keys(quantities).forEach(key => {
-        inputs[key] = quantities[key] > 0 ? quantities[key].toString() : '';
-      });
-      return inputs;
-    }
-    return {};
-  });
-  
+  const [isScrolled, setIsScrolled] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Save current page to localStorage
+  // Save state whenever it changes
   useEffect(() => {
-    localStorage.setItem('graalCurrentPage', currentPage);
-  }, [currentPage]);
+    saveState({
+      quantities,
+      expandedCategories,
+      troRatio,
+      showTroConversion,
+      inputValues,
+      originalRatio,
+      position,
+      currentPage
+    });
+  }, [quantities, expandedCategories, troRatio, showTroConversion, inputValues, originalRatio, position, currentPage]);
 
   // Check if mobile and track scroll
   useEffect(() => {
@@ -864,66 +821,18 @@ export default function CalculatorPage() {
     };
   }, []);
 
-  // Load saved position from localStorage
-  useEffect(() => {
-    const savedPosition = localStorage.getItem('graalTotalPosition');
-    if (savedPosition) {
-      setPosition(JSON.parse(savedPosition));
-    } else {
-      if (window.innerWidth < 768) {
-        setPosition({
-          x: window.innerWidth / 2 - 150,
-          y: 20
-        });
-      }
-    }
-  }, []);
-
-  // Save position to localStorage
-  useEffect(() => {
-    localStorage.setItem('graalTotalPosition', JSON.stringify(position));
-  }, [position]);
-
-  // Handle drag
-  const handleMouseDown = (e) => {
-    setIsDragging(true);
-    setDragOffset({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y
-    });
-  };
-
-  const handleTouchStart = (e) => {
-    setIsDragging(true);
-    const touch = e.touches[0];
-    setDragOffset({
-      x: touch.clientX - position.x,
-      y: touch.clientY - position.y
-    });
-  };
-
+  // Drag event handlers
   useEffect(() => {
     const handleMouseMove = (e) => {
-      if (isDragging) {
-        setPosition({
-          x: e.clientX - dragOffset.x,
-          y: e.clientY - dragOffset.y
-        });
-      }
+      handleDragMove(e, isDragging, dragOffset, setPosition);
     };
 
     const handleTouchMove = (e) => {
-      if (isDragging) {
-        const touch = e.touches[0];
-        setPosition({
-          x: touch.clientX - dragOffset.x,
-          y: touch.clientY - dragOffset.y
-        });
-      }
+      handleTouchMove(e, isDragging, dragOffset, setPosition);
     };
 
     const handleMouseUp = () => {
-      setIsDragging(false);
+      handleDragEnd(setIsDragging);
     };
 
     if (isDragging) {
@@ -941,27 +850,7 @@ export default function CalculatorPage() {
     };
   }, [isDragging, dragOffset]);
 
-  // Save to localStorage
-  useEffect(() => {
-    localStorage.setItem('graalCalculatorData', JSON.stringify(quantities));
-  }, [quantities]);
-
-  useEffect(() => {
-    localStorage.setItem('graalExpandedCategories', JSON.stringify(expandedCategories));
-  }, [expandedCategories]);
-
-  useEffect(() => {
-    localStorage.setItem('graalTroRatio', troRatio.toString());
-  }, [troRatio]);
-
-  useEffect(() => {
-    localStorage.setItem('graalShowTroConversion', JSON.stringify(showTroConversion));
-  }, [showTroConversion]);
-
-  useEffect(() => {
-    localStorage.setItem('graalInputValues', JSON.stringify(inputValues));
-  }, [inputValues]);
-
+  // Event handlers using backend functions
   const toggleCategory = (category) => {
     setExpandedCategories(prev => ({
       ...prev,
@@ -973,145 +862,66 @@ export default function CalculatorPage() {
     setShowTroConversion(prev => !prev);
   };
 
-  const handleQuantityChange = (itemName, value) => {
-    setInputValues(prev => ({
-      ...prev,
-      [itemName]: value
-    }));
-    
-    if (value === '' || value === null || value === undefined) {
-      setQuantities(prev => ({
-        ...prev,
-        [itemName]: 0
-      }));
-    } else {
-      const { value: evaluatedValue } = evaluateExpression(value);
-      setQuantities(prev => ({
-        ...prev,
-        [itemName]: evaluatedValue
-      }));
-    }
+  const handleQuantityChangeWrapper = (itemName, value) => {
+    handleQuantityChange(itemName, value, quantities, setQuantities, inputValues, setInputValues);
   };
 
-  const handleQuantityBlur = (itemName) => {
-    const value = inputValues[itemName] || '';
-    if (value === '') return;
-
-    const { value: evaluatedValue } = evaluateExpression(value);
-    
-    if (evaluatedValue > 0) {
-      setInputValues(prev => ({
-        ...prev,
-        [itemName]: evaluatedValue.toString()
-      }));
-      setQuantities(prev => ({
-        ...prev,
-        [itemName]: evaluatedValue
-      }));
-    }
+  const handleQuantityBlurWrapper = (itemName) => {
+    handleQuantityBlur(itemName, inputValues, setInputValues, quantities, setQuantities);
   };
 
-  const handleQuantityKeyPress = (e, itemName) => {
-    if (e.key === 'Enter') {
-      handleQuantityBlur(itemName);
-      e.target.blur();
-    }
+  const incrementQuantityWrapper = (itemName) => {
+    incrementQuantity(itemName, quantities, setQuantities, inputValues, setInputValues);
   };
 
-  const incrementQuantity = (itemName) => {
-    const currentValue = quantities[itemName] || 0;
-    const newValue = currentValue + 1;
-    setQuantities(prev => ({
-      ...prev,
-      [itemName]: newValue
-    }));
-    setInputValues(prev => ({
-      ...prev,
-      [itemName]: newValue.toString()
-    }));
+  const decrementQuantityWrapper = (itemName) => {
+    decrementQuantity(itemName, quantities, setQuantities, inputValues, setInputValues);
   };
 
-  const decrementQuantity = (itemName) => {
-    const currentValue = quantities[item.name] || 0;
-    const newValue = Math.max(0, currentValue - 1);
-    setQuantities(prev => ({
-      ...prev,
-      [itemName]: newValue
-    }));
-    setInputValues(prev => ({
-      ...prev,
-      [itemName]: newValue > 0 ? newValue.toString() : ''
-    }));
+  const handleTroRatioChangeWrapper = (value) => {
+    handleTroRatioChange(value, setTroRatio);
   };
 
-  const calculateTotal = () => {
-    let total = 0;
-    Object.entries(sellableItems).forEach(([category, items]) => {
-      items.forEach(item => {
-        total += item.price * (quantities[item.name] || 0);
-      });
-    });
-    return total;
+  const incrementTroRatioWrapper = () => {
+    incrementTroRatio(troRatio, setTroRatio);
   };
 
-  const resetAll = () => {
-    setQuantities({});
-    setInputValues({});
-    // Also reset the original ratio when user resets everything
-    setOriginalRatio(troRatio);
-    localStorage.setItem('graalOriginalTroRatio', troRatio.toString());
-    localStorage.removeItem('graalCalculatorData');
-    localStorage.removeItem('graalInputValues');
+  const decrementTroRatioWrapper = () => {
+    decrementTroRatio(troRatio, setTroRatio);
   };
 
-  const resetRatioToOriginal = () => {
-    setTroRatio(originalRatio);
+  const resetAllWrapper = () => {
+    resetAll(setQuantities, setInputValues, troRatio, setOriginalRatio);
   };
 
-  const handleTroRatioChange = (value) => {
-    let ratio = parseFloat(value) || 1;
-    ratio = Math.max(1, Math.min(10, ratio));
-    setTroRatio(ratio);
+  const resetRatioToOriginalWrapper = () => {
+    resetRatioToOriginal(originalRatio, setTroRatio);
   };
 
-  const incrementTroRatio = () => {
-    setTroRatio(prev => {
-      const newValue = parseFloat((prev + 0.1).toFixed(1));
-      return Math.min(10, newValue);
-    });
+  const handleMouseDownWrapper = (e) => {
+    handleDragStart(e, setIsDragging, setDragOffset, position);
   };
 
-  const decrementTroRatio = () => {
-    setTroRatio(prev => {
-      const newValue = parseFloat((prev - 0.1).toFixed(1));
-      return Math.max(1, newValue);
-    });
+  const handleTouchStartWrapper = (e) => {
+    handleTouchStart(e, setIsDragging, setDragOffset, position);
   };
 
-  const calculateTroValue = (ratio = troRatio) => {
-    return (total / ratio).toFixed(2);
-  };
-
-  // Calculate the difference between original and current ratio
-  const calculateRatioDifference = () => {
-    const originalTroValue = parseFloat(calculateTroValue(originalRatio));
-    const currentTroValue = parseFloat(calculateTroValue(troRatio));
-    const difference = currentTroValue - originalTroValue;
-    const percentChange = originalRatio !== 0 ? ((troRatio - originalRatio) / originalRatio * 100) : 0;
-    
-    return {
-      difference: difference.toFixed(2),
-      percentChange: percentChange.toFixed(1),
-      isIncrease: difference > 0,
-      hasChanged: Math.abs(troRatio - originalRatio) > 0.01
-    };
-  };
+  // Calculations using backend functions
+  const total = calculateTotal(quantities, sellableItems);
+  const categoryTotals = calculateCategoryTotals(quantities, sellableItems);
+  const troValue = calculateTroValue(total, troRatio);
+  const ratioDiff = calculateRatioDifference(troRatio, originalRatio, total);
 
   const categories = {
     shells: { 
       name: "Shells", 
       icon: sellablesIcons.shell,
       bgColor: "bg-blue-500/10",
+    },
+    mushrooms: { 
+      name: "Mushrooms", 
+      icon: sellablesIcons.mushrooms,
+      bgColor: "bg-red-500/10",
     },
     trash: { 
       name: "Trash Items", 
@@ -1140,9 +950,6 @@ export default function CalculatorPage() {
     }
   };
 
-  const total = calculateTotal();
-  const ratioDiff = calculateRatioDifference();
-
   // Show Tro Converter if enabled
   if (currentPage === 'tro-converter') {
     return <TroToGralatsConverter onBack={() => setCurrentPage('main')} />;
@@ -1155,7 +962,7 @@ export default function CalculatorPage() {
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-lg border border-blue-200 mb-6 hover:scale-110 hover:rotate-3 transition-all duration-300">
             <img 
-              src={sellablesIcons.calculator}
+              src="/src/assets/calculator-nobg.png" 
               alt="Calculator Icon"
               className="w-40 h-15"
               onError={(e) => {
@@ -1183,8 +990,8 @@ export default function CalculatorPage() {
         >
           <div 
             className="select-none"
-            onMouseDown={handleMouseDown}
-            onTouchStart={handleTouchStart}
+            onMouseDown={handleMouseDownWrapper}
+            onTouchStart={handleTouchStartWrapper}
           >
             <div className={`bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 rounded-2xl shadow-2xl px-4 sm:px-6 py-4 backdrop-blur-lg border-2 border-green-400/50 max-w-sm ${
               isDragging ? 'scale-105 shadow-3xl ring-4 ring-green-300/50' : 'hover:shadow-3xl'
@@ -1223,7 +1030,7 @@ export default function CalculatorPage() {
                   </button>
                   
                   <button
-                    onClick={resetAll}
+                    onClick={resetAllWrapper}
                     onMouseDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
                     className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-semibold rounded-xl transition-all duration-300 border border-white/30 hover:scale-105 group"
@@ -1250,7 +1057,7 @@ export default function CalculatorPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-white/70 font-medium">Tro Value</p>
                           <p className="text-lg sm:text-xl font-bold text-white">
-                            {calculateTroValue()} <span className="text-xs sm:text-sm text-white/80">Tro</span>
+                            {troValue} <span className="text-xs sm:text-sm text-white/80">Tro</span>
                           </p>
                         </div>
                       </div>
@@ -1263,7 +1070,7 @@ export default function CalculatorPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={decrementTroRatio}
+                          onClick={decrementTroRatioWrapper}
                           onMouseDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
                           disabled={troRatio <= 1}
@@ -1277,13 +1084,13 @@ export default function CalculatorPage() {
                           min="1"
                           max="10"
                           value={troRatio}
-                          onChange={(e) => handleTroRatioChange(e.target.value)}
+                          onChange={(e) => handleTroRatioChangeWrapper(e.target.value)}
                           onMouseDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
                           className="flex-1 text-center text-sm font-bold text-slate-900 bg-white rounded-md py-2 px-2 focus:outline-none focus:ring-2 focus:ring-amber-400"
                         />
                         <button
-                          onClick={incrementTroRatio}
+                          onClick={incrementTroRatioWrapper}
                           onMouseDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
                           disabled={troRatio >= 10}
@@ -1296,7 +1103,7 @@ export default function CalculatorPage() {
 
                     <div className="bg-white/10 rounded-lg p-2 border border-white/20">
                       <p className="text-xs text-white/60 text-center">
-                        {total.toLocaleString()} ÷ {troRatio} = {calculateTroValue()} Tro
+                        {total.toLocaleString()} ÷ {troRatio} = {troValue} Tro
                       </p>
                     </div>
 
@@ -1385,7 +1192,7 @@ export default function CalculatorPage() {
               </button>
 
               <button
-                onClick={resetAll}
+                onClick={resetAllWrapper}
                 className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-slate-100 hover:bg-red-500 hover:text-white text-slate-700 font-semibold rounded-xl transition-all duration-300 border border-slate-300 hover:border-red-500"
               >
                 <RotateCcw size={16} />
@@ -1406,7 +1213,7 @@ export default function CalculatorPage() {
                       </label>
                       {ratioDiff.hasChanged && (
                         <button
-                          onClick={resetRatioToOriginal}
+                          onClick={resetRatioToOriginalWrapper}
                           className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-blue-50 transition-all"
                         >
                           <RotateCcw size={12} />
@@ -1416,7 +1223,7 @@ export default function CalculatorPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={decrementTroRatio}
+                        onClick={decrementTroRatioWrapper}
                         disabled={troRatio <= 1}
                         className="w-10 h-10 bg-white hover:bg-slate-200 border-2 border-slate-300 text-slate-700 rounded-xl transition-all duration-300 flex items-center justify-center font-bold shadow-sm disabled:opacity-50"
                       >
@@ -1428,11 +1235,11 @@ export default function CalculatorPage() {
                         min="1"
                         max="10"
                         value={troRatio}
-                        onChange={(e) => handleTroRatioChange(e.target.value)}
+                        onChange={(e) => handleTroRatioChangeWrapper(e.target.value)}
                         className="flex-1 text-center text-xl sm:text-2xl font-bold text-slate-900 bg-white border-2 border-slate-300 rounded-xl py-2 sm:py-3 px-3 sm:px-4 focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
                       <button
-                        onClick={incrementTroRatio}
+                        onClick={incrementTroRatioWrapper}
                         disabled={troRatio >= 10}
                         className="w-10 h-10 bg-white hover:bg-slate-200 border-2 border-slate-300 text-slate-700 rounded-xl transition-all duration-300 flex items-center justify-center font-bold shadow-sm disabled:opacity-50"
                       >
@@ -1471,13 +1278,13 @@ export default function CalculatorPage() {
                             </div>
                             <div className="flex justify-between pt-2 border-t border-slate-200">
                               <span className="text-slate-600">Original Tro Value:</span>
-                              <span className="font-semibold text-slate-800">{calculateTroValue(originalRatio)} Tro</span>
+                              <span className="font-semibold text-slate-800">{calculateTroValue(total, originalRatio)} Tro</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-slate-600">Current Tro Value:</span>
                               <span className={`font-bold ${
                                 ratioDiff.isIncrease ? 'text-green-600' : 'text-red-600'
-                              }`}>{calculateTroValue(troRatio)} Tro</span>
+                              }`}>{troValue} Tro</span>
                             </div>
                             <div className={`flex justify-between pt-2 border-t ${
                               ratioDiff.isIncrease ? 'border-green-200' : 'border-red-200'
@@ -1512,13 +1319,13 @@ export default function CalculatorPage() {
                       <div>
                         <p className="text-sm font-semibold text-amber-900 uppercase">Tro Value</p>
                         <p className="text-3xl sm:text-4xl font-bold text-white">
-                          {calculateTroValue()}
+                          {troValue}
                         </p>
                       </div>
                     </div>
                     <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 border border-amber-200/30">
                       <p className="text-xs text-amber-900 font-medium text-center">
-                        {total.toLocaleString()} ÷ {troRatio} = {calculateTroValue()} Tro
+                        {total.toLocaleString()} ÷ {troRatio} = {troValue} Tro
                       </p>
                     </div>
 
@@ -1549,9 +1356,7 @@ export default function CalculatorPage() {
         {/* Categories */}
         <div className="space-y-4 mb-20">
           {Object.entries(categories).map(([categoryKey, category]) => {
-            const categoryTotal = sellableItems[categoryKey].reduce((sum, item) => 
-              sum + (item.price * (quantities[item.name] || 0)), 0
-            );
+            const categoryTotal = categoryTotals[categoryKey] || 0;
 
             return (
               <div key={categoryKey} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -1611,7 +1416,7 @@ export default function CalculatorPage() {
 
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={() => decrementQuantity(item.name)}
+                                onClick={() => decrementQuantityWrapper(item.name)}
                                 className="w-8 h-8 sm:w-9 sm:h-9 bg-white hover:bg-red-100 border-2 border-slate-300 hover:border-red-400 text-slate-700 hover:text-red-600 rounded-lg transition-all duration-300 flex items-center justify-center font-bold shadow-sm"
                               >
                                 <Minus size={14} />
@@ -1621,9 +1426,14 @@ export default function CalculatorPage() {
                                 <input
                                   type="text"
                                   value={currentInput}
-                                  onChange={(e) => handleQuantityChange(item.name, e.target.value)}
-                                  onBlur={() => handleQuantityBlur(item.name)}
-                                  onKeyPress={(e) => handleQuantityKeyPress(e, item.name)}
+                                  onChange={(e) => handleQuantityChangeWrapper(item.name, e.target.value)}
+                                  onBlur={() => handleQuantityBlurWrapper(item.name)}
+                                  onKeyPress={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleQuantityBlurWrapper(item.name);
+                                      e.target.blur();
+                                    }
+                                  }}
                                   className="w-full text-center text-base sm:text-lg font-bold rounded-lg py-1.5 sm:py-2 px-2 focus:outline-none focus:ring-2 border-2 transition-colors text-slate-900 bg-white border-slate-300 focus:ring-blue-500 focus:border-blue-500"
                                   placeholder="0"
                                 />
@@ -1637,7 +1447,7 @@ export default function CalculatorPage() {
                               </div>
                               
                               <button
-                                onClick={() => incrementQuantity(item.name)}
+                                onClick={() => incrementQuantityWrapper(item.name)}
                                 className="w-8 h-8 sm:w-9 sm:h-9 bg-white hover:bg-green-100 border-2 border-slate-300 hover:border-green-400 text-slate-700 hover:text-green-600 rounded-lg transition-all duration-300 flex items-center justify-center font-bold shadow-sm"
                               >
                                 <Plus size={14} />
