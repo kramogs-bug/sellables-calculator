@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, ChevronDown, Plus, Minus, Sparkles, RotateCcw, ArrowRightLeft, ShoppingCart, Coins } from 'lucide-react';
+import { DollarSign, ChevronDown, Plus, Minus, Sparkles, RotateCcw, ArrowRightLeft, ShoppingCart, Coins, TrendingUp, TrendingDown } from 'lucide-react';
 
 // Import icons from assets.js
 import { sellablesIcons } from "../assets/assets.js";
@@ -46,16 +46,13 @@ const evaluateExpression = (expression) => {
   
   const expr = String(expression).replace(/\s+/g, '');
   
-  // Allow any input during typing, only validate when finalizing
   if (expr === '') return { value: 0, isValid: true };
   
   try {
-    // More permissive evaluation - allow any expression
     const result = new Function(`return ${expr}`)();
     const finalValue = Math.max(0, Math.floor(Number(result))) || 0;
     return { value: finalValue, isValid: true };
   } catch (error) {
-    // Return current value as 0 but don't mark as invalid during typing
     return { value: 0, isValid: true };
   }
 };
@@ -803,14 +800,30 @@ export default function CalculatorPage() {
   const [position, setPosition] = useState({ x: 0, y: 80 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  
   const [troRatio, setTroRatio] = useState(() => {
     const saved = localStorage.getItem('graalTroRatio');
     return saved ? parseFloat(saved) : 3.8;
   });
+  
+  // Store the FIRST original ratio (persists until reset or page load)
+  const [originalRatio, setOriginalRatio] = useState(() => {
+    const savedOriginal = localStorage.getItem('graalOriginalTroRatio');
+    if (savedOriginal) {
+      return parseFloat(savedOriginal);
+    }
+    // If no original saved, use current ratio as original
+    const saved = localStorage.getItem('graalTroRatio');
+    const initial = saved ? parseFloat(saved) : 3.8;
+    localStorage.setItem('graalOriginalTroRatio', initial.toString());
+    return initial;
+  });
+  
   const [showTroConversion, setShowTroConversion] = useState(() => {
     const saved = localStorage.getItem('graalShowTroConversion');
     return saved ? JSON.parse(saved) : false;
   });
+  
   const [inputValues, setInputValues] = useState(() => {
     const saved = localStorage.getItem('graalCalculatorData');
     if (saved) {
@@ -823,6 +836,7 @@ export default function CalculatorPage() {
     }
     return {};
   });
+  
   const [isMobile, setIsMobile] = useState(false);
 
   // Save current page to localStorage
@@ -944,7 +958,6 @@ export default function CalculatorPage() {
     localStorage.setItem('graalShowTroConversion', JSON.stringify(showTroConversion));
   }, [showTroConversion]);
 
-  // Save input values to localStorage
   useEffect(() => {
     localStorage.setItem('graalInputValues', JSON.stringify(inputValues));
   }, [inputValues]);
@@ -1019,7 +1032,7 @@ export default function CalculatorPage() {
   };
 
   const decrementQuantity = (itemName) => {
-    const currentValue = quantities[itemName] || 0;
+    const currentValue = quantities[item.name] || 0;
     const newValue = Math.max(0, currentValue - 1);
     setQuantities(prev => ({
       ...prev,
@@ -1044,8 +1057,15 @@ export default function CalculatorPage() {
   const resetAll = () => {
     setQuantities({});
     setInputValues({});
+    // Also reset the original ratio when user resets everything
+    setOriginalRatio(troRatio);
+    localStorage.setItem('graalOriginalTroRatio', troRatio.toString());
     localStorage.removeItem('graalCalculatorData');
     localStorage.removeItem('graalInputValues');
+  };
+
+  const resetRatioToOriginal = () => {
+    setTroRatio(originalRatio);
   };
 
   const handleTroRatioChange = (value) => {
@@ -1068,8 +1088,23 @@ export default function CalculatorPage() {
     });
   };
 
-  const calculateTroValue = () => {
-    return (total / troRatio).toFixed(2);
+  const calculateTroValue = (ratio = troRatio) => {
+    return (total / ratio).toFixed(2);
+  };
+
+  // Calculate the difference between original and current ratio
+  const calculateRatioDifference = () => {
+    const originalTroValue = parseFloat(calculateTroValue(originalRatio));
+    const currentTroValue = parseFloat(calculateTroValue(troRatio));
+    const difference = currentTroValue - originalTroValue;
+    const percentChange = originalRatio !== 0 ? ((troRatio - originalRatio) / originalRatio * 100) : 0;
+    
+    return {
+      difference: difference.toFixed(2),
+      percentChange: percentChange.toFixed(1),
+      isIncrease: difference > 0,
+      hasChanged: Math.abs(troRatio - originalRatio) > 0.01
+    };
   };
 
   const categories = {
@@ -1106,6 +1141,7 @@ export default function CalculatorPage() {
   };
 
   const total = calculateTotal();
+  const ratioDiff = calculateRatioDifference();
 
   // Show Tro Converter if enabled
   if (currentPage === 'tro-converter') {
@@ -1119,7 +1155,7 @@ export default function CalculatorPage() {
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-lg border border-blue-200 mb-6 hover:scale-110 hover:rotate-3 transition-all duration-300">
             <img 
-              src={sellablesIcons.calculator} 
+              src="/src/assets/calculator-nobg.png" 
               alt="Calculator Icon"
               className="w-40 h-15"
               onError={(e) => {
@@ -1264,6 +1300,31 @@ export default function CalculatorPage() {
                       </p>
                     </div>
 
+                    {/* Ratio Change Indicator */}
+                    {ratioDiff.hasChanged && (
+                      <div className={`rounded-lg p-3 border-2 ${
+                        ratioDiff.isIncrease 
+                          ? 'bg-green-500/20 border-green-400' 
+                          : 'bg-red-500/20 border-red-400'
+                      }`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-white font-semibold flex items-center gap-1">
+                            {ratioDiff.isIncrease ? (
+                              <><TrendingUp size={14} /> More Tro</>
+                            ) : (
+                              <><TrendingDown size={14} /> Less Tro</>
+                            )}
+                          </span>
+                          <span className="text-xs text-white/80">
+                            {ratioDiff.isIncrease ? '+' : ''}{ratioDiff.difference} Tro
+                          </span>
+                        </div>
+                        <div className="text-xs text-white/70">
+                          Ratio: {originalRatio.toFixed(1)} → {troRatio} ({ratioDiff.percentChange > 0 ? '+' : ''}{ratioDiff.percentChange}%)
+                        </div>
+                      </div>
+                    )}
+
                     {/* Tro to Gralats Button */}
                     <button
                       onClick={() => setCurrentPage('tro-converter')}
@@ -1339,9 +1400,20 @@ export default function CalculatorPage() {
               <div className="flex flex-col gap-6">
                 <div className="flex flex-col lg:flex-row items-stretch gap-6">
                   <div className="flex-1 bg-gradient-to-br from-slate-50 to-amber-50 rounded-xl p-4 sm:p-6 border border-amber-200">
-                    <label className="block text-sm font-semibold text-slate-600 mb-4">
-                      Conversion Ratio (Gralats ÷ Ratio = Tro)
-                    </label>
+                    <div className="flex items-center justify-between mb-4">
+                      <label className="block text-sm font-semibold text-slate-600">
+                        Conversion Ratio (Gralats ÷ Ratio = Tro)
+                      </label>
+                      {ratioDiff.hasChanged && (
+                        <button
+                          onClick={resetRatioToOriginal}
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-blue-50 transition-all"
+                        >
+                          <RotateCcw size={12} />
+                          Reset to {originalRatio.toFixed(1)}
+                        </button>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3">
                       <button
                         onClick={decrementTroRatio}
@@ -1367,6 +1439,68 @@ export default function CalculatorPage() {
                         <Plus size={16} />
                       </button>
                     </div>
+
+                    {/* Ratio Change Comparison Display */}
+                    {ratioDiff.hasChanged && (
+                      <div className="mt-4 space-y-2">
+                        <div className={`rounded-lg p-4 border-2 ${
+                          ratioDiff.isIncrease 
+                            ? 'bg-green-50 border-green-300' 
+                            : 'bg-red-50 border-red-300'
+                        }`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className={`text-sm font-bold flex items-center gap-2 ${
+                              ratioDiff.isIncrease ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                              {ratioDiff.isIncrease ? (
+                                <><TrendingUp size={18} /> You'll Get More Tro</>
+                              ) : (
+                                <><TrendingDown size={18} /> You'll Get Less Tro</>
+                              )}
+                            </span>
+                          </div>
+                          
+                          <div className="space-y-1 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-slate-600">Original Ratio:</span>
+                              <span className="font-semibold text-slate-800">{originalRatio.toFixed(1)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-600">Current Ratio:</span>
+                              <span className="font-semibold text-slate-800">{troRatio.toFixed(1)}</span>
+                            </div>
+                            <div className="flex justify-between pt-2 border-t border-slate-200">
+                              <span className="text-slate-600">Original Tro Value:</span>
+                              <span className="font-semibold text-slate-800">{calculateTroValue(originalRatio)} Tro</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-600">Current Tro Value:</span>
+                              <span className={`font-bold ${
+                                ratioDiff.isIncrease ? 'text-green-600' : 'text-red-600'
+                              }`}>{calculateTroValue(troRatio)} Tro</span>
+                            </div>
+                            <div className={`flex justify-between pt-2 border-t ${
+                              ratioDiff.isIncrease ? 'border-green-200' : 'border-red-200'
+                            }`}>
+                              <span className="font-semibold text-slate-700">Difference:</span>
+                              <span className={`font-bold text-lg ${
+                                ratioDiff.isIncrease ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                                {ratioDiff.isIncrease ? '+' : ''}{ratioDiff.difference} Tro
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-600">Change:</span>
+                              <span className={`font-semibold ${
+                                ratioDiff.isIncrease ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                                {ratioDiff.percentChange > 0 ? '+' : ''}{ratioDiff.percentChange}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Gralats to Tro Display */}
@@ -1387,18 +1521,25 @@ export default function CalculatorPage() {
                         {total.toLocaleString()} ÷ {troRatio} = {calculateTroValue()} Tro
                       </p>
                     </div>
-                  </div>
-                </div>
 
-                {/* Tro to Gralats Button */}
-                <div className="flex justify-center">
-                  <button
-                    onClick={() => setCurrentPage('tro-converter')}
-                    className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-orange-400 to-red-500 hover:from-orange-500 hover:to-red-600 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
-                  >
-                    <ShoppingCart size={16} />
-                    <span>Open Tro to Gralats Converter</span>
-                  </button>
+                    {/* Show difference in the card too */}
+                    {ratioDiff.hasChanged && (
+                      <div className={`mt-3 rounded-lg p-3 border-2 ${
+                        ratioDiff.isIncrease 
+                          ? 'bg-green-500/30 border-green-300' 
+                          : 'bg-red-500/30 border-red-300'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-white font-semibold">
+                            {ratioDiff.isIncrease ? 'Gaining' : 'Losing'}
+                          </span>
+                          <span className="text-sm text-white font-bold">
+                            {ratioDiff.isIncrease ? '+' : ''}{ratioDiff.difference} Tro
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
