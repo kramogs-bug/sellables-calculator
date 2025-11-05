@@ -1392,6 +1392,7 @@ export default function CalculatorPage() {
                         const currentQty = quantities[item.name] || 0;
                         const currentInput = inputValues[item.name] !== undefined ? inputValues[item.name] : '';
                         const isExpression = currentInput && /[+\-*/()]/.test(currentInput);
+                        const [showMessage, setShowMessage] = useState(true);
                         
                         return (
                           <div
@@ -1427,7 +1428,11 @@ export default function CalculatorPage() {
                                   type="text"
                                   value={currentInput}
                                   onChange={(e) => handleQuantityChangeWrapper(item.name, e.target.value)}
-                                  onBlur={() => handleQuantityBlurWrapper(item.name)}
+                                  onFocus={() => setShowMessage(false)}
+                                  onBlur={() => {
+                                    handleQuantityBlurWrapper(item.name);
+                                    setShowMessage(true);
+                                  }}
                                   onKeyPress={(e) => {
                                     if (e.key === 'Enter') {
                                       handleQuantityBlurWrapper(item.name);
@@ -1455,11 +1460,13 @@ export default function CalculatorPage() {
                             </div>
 
                             {/* Red message for expression input */}
-                            <div className="mt-2">
-                              <p className="text-xs text-red-500 text-center">
-                                You can input expressions like 200+400 for items with the same price
-                              </p>
-                            </div>
+                            {showMessage && (
+                              <div className="mt-2">
+                                <p className="text-xs text-red-500 text-center">
+                                  You can input expressions like 200+400 for items with the same price
+                                </p>
+                              </div>
+                            )}
 
                             <div className="mt-3 pt-3 border-t border-slate-200">
                               <div className="flex items-center justify-between text-xs sm:text-sm">
