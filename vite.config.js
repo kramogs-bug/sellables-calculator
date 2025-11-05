@@ -4,6 +4,10 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(),tailwindcss()],
-  base: process.env.VITE_BASE_PATH || "/sellables-calculator",
+  plugins: [react(), tailwindcss()],
+  base: "/",
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true
+  }
 })
