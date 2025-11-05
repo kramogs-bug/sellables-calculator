@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Home, Info } from 'lucide-react';
+import { Menu, X, Home, Info, BarChart3 } from 'lucide-react';
 import { useState } from 'react';
 import { sellablesIcons } from '../assets/assets.js';
 
@@ -22,7 +22,6 @@ export default function Navbar() {
                   alt="Calculator Icon"
                   className="w-30 h-15 transition-transform duration-300 group-hover:scale-110"
                   onError={(e) => {
-                    // Fallback if calculator icon fails to load
                     console.warn('Calculator icon not found, using star icon as fallback');
                     e.target.src = sellablesIcons.star;
                     e.target.className = "w-10 h-10 transition-transform duration-300 group-hover:scale-110";
@@ -71,6 +70,17 @@ export default function Navbar() {
                 />
               </div>
               <span>Calculator</span>
+            </Link>
+            <Link 
+              to="/tracker" 
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 font-semibold transform hover:scale-105 ${
+                isActive('/tracker') 
+                  ? 'bg-blue-500 text-white shadow-lg scale-105' 
+                  : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600 hover:shadow-md'
+              }`}
+            >
+              <BarChart3 size={20} className="transition-transform duration-300 group-hover:rotate-12" />
+              <span>Tracker</span>
             </Link>
             <Link 
               to="/about" 
@@ -126,7 +136,6 @@ export default function Navbar() {
                 : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600'
             }`}
             onClick={() => setIsOpen(false)}
-            style={{ animationDelay: '0ms' }}
           >
             <Home size={20} />
             <span>Home</span>
@@ -139,7 +148,6 @@ export default function Navbar() {
                 : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600'
             }`}
             onClick={() => setIsOpen(false)}
-            style={{ animationDelay: '100ms' }}
           >
             <div className="w-5 h-5 flex items-center justify-center">
               <img 
@@ -155,6 +163,18 @@ export default function Navbar() {
             <span>Calculator</span>
           </Link>
           <Link 
+            to="/tracker" 
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 font-semibold transform hover:scale-105 hover:translate-x-2 ${
+              isActive('/tracker') 
+                ? 'bg-blue-500 text-white shadow-lg scale-105' 
+                : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600'
+            }`}
+            onClick={() => setIsOpen(false)}
+          >
+            <BarChart3 size={20} />
+            <span>Tracker</span>
+          </Link>
+          <Link 
             to="/about" 
             className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 font-semibold transform hover:scale-105 hover:translate-x-2 ${
               isActive('/about') 
@@ -162,7 +182,6 @@ export default function Navbar() {
                 : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600'
             }`}
             onClick={() => setIsOpen(false)}
-            style={{ animationDelay: '200ms' }}
           >
             <Info size={20} />
             <span>About</span>
