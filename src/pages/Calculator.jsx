@@ -912,6 +912,11 @@ export default function CalculatorPage() {
   const troValue = calculateTroValue(total, troRatio);
   const ratioDiff = calculateRatioDifference(troRatio, originalRatio, total);
 
+  // Format numbers with commas for display
+  const formatDisplayNumber = (number) => {
+    return number.toLocaleString('en-US');
+  };
+
   const categories = {
     shells: { 
       name: "Shells", 
@@ -1004,7 +1009,7 @@ export default function CalculatorPage() {
                   <div>
                     <p className="text-xs font-semibold text-white/80 uppercase tracking-wider">Total Value</p>
                     <p className="text-lg sm:text-2xl font-bold text-white whitespace-nowrap">
-                      {total.toLocaleString()} <span className="text-sm sm:text-base text-white/80">Gralats</span>
+                      {formatDisplayNumber(total)} <span className="text-sm sm:text-base text-white/80">Gralats</span>
                     </p>
                   </div>
                 </div>
@@ -1057,7 +1062,7 @@ export default function CalculatorPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-white/70 font-medium">Tro Value</p>
                           <p className="text-lg sm:text-xl font-bold text-white">
-                            {troValue} <span className="text-xs sm:text-sm text-white/80">Tro</span>
+                            {formatDisplayNumber(parseFloat(troValue))} <span className="text-xs sm:text-sm text-white/80">Tro</span>
                           </p>
                         </div>
                       </div>
@@ -1103,7 +1108,7 @@ export default function CalculatorPage() {
 
                     <div className="bg-white/10 rounded-lg p-2 border border-white/20">
                       <p className="text-xs text-white/60 text-center">
-                        {total.toLocaleString()} ÷ {troRatio} = {troValue} Tro
+                        {formatDisplayNumber(total)} ÷ {troRatio} = {formatDisplayNumber(parseFloat(troValue))} Tro
                       </p>
                     </div>
 
@@ -1123,7 +1128,7 @@ export default function CalculatorPage() {
                             )}
                           </span>
                           <span className="text-xs text-white/80">
-                            {ratioDiff.isIncrease ? '+' : ''}{ratioDiff.difference} Tro
+                            {ratioDiff.isIncrease ? '+' : ''}{formatDisplayNumber(parseFloat(ratioDiff.difference))} Tro
                           </span>
                         </div>
                         <div className="text-xs text-white/70">
@@ -1145,12 +1150,6 @@ export default function CalculatorPage() {
                   </div>
                 </div>
               )}
-              
-              <div className="mt-2 text-center">
-                <p className="text-xs text-white/60 font-medium">
-                  {isMobile ? '👆 Tap and hold to move' : '✋ Drag to move'}
-                </p>
-              </div>
             </div>
           </div>
         </div>
@@ -1165,7 +1164,7 @@ export default function CalculatorPage() {
               <div>
                 <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Total Value</p>
                 <p className="text-3xl sm:text-4xl font-bold text-slate-800">
-                  {total.toLocaleString()} <span className="text-xl sm:text-2xl text-slate-500">Gralats</span>
+                  {formatDisplayNumber(total)} <span className="text-xl sm:text-2xl text-slate-500">Gralats</span>
                 </p>
               </div>
             </div>
@@ -1325,7 +1324,7 @@ export default function CalculatorPage() {
                     </div>
                     <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 border border-amber-200/30">
                       <p className="text-xs text-amber-900 font-medium text-center">
-                        {total.toLocaleString()} ÷ {troRatio} = {troValue} Tro
+                        {formatDisplayNumber(total)} ÷ {troRatio} = {troValue} Tro
                       </p>
                     </div>
 
@@ -1375,7 +1374,7 @@ export default function CalculatorPage() {
                   </div>
                   <div className="flex items-center gap-3 sm:gap-4">
                     <p className="text-base sm:text-lg font-bold text-slate-800">
-                      {categoryTotal.toLocaleString()} <span className="text-xs sm:text-sm text-slate-500">Gralats</span>
+                      {formatDisplayNumber(categoryTotal)} <span className="text-xs sm:text-sm text-slate-500">Gralats</span>
                     </p>
                     <ChevronDown className="text-slate-500" size={18} style={{ transform: expandedCategories[categoryKey] ? 'rotate(180deg)' : 'rotate(0deg)' }} />
                   </div>
@@ -1410,7 +1409,7 @@ export default function CalculatorPage() {
                               <div className="flex-1 min-w-0">
                                 <p className="font-semibold text-slate-800 text-sm sm:text-base truncate">{item.name}</p>
                                 <p className="text-xs sm:text-sm text-emerald-600 font-medium">
-                                  {item.displayPrice || `${item.price} Gralats${item.unit === 'flowers' ? '/pc' : ''}`}
+                                  {item.displayPrice || `${formatDisplayNumber(item.price)} Gralats${item.unit === 'flowers' ? '/pc' : ''}`}
                                 </p>
                               </div>
                             </div>
@@ -1445,7 +1444,7 @@ export default function CalculatorPage() {
                                 {isExpression && currentQty > 0 && (
                                   <div className="absolute -bottom-5 left-0 right-0">
                                     <p className="text-xs text-green-600 text-center font-medium">
-                                      = {currentQty}
+                                      = {formatDisplayNumber(currentQty)}
                                     </p>
                                   </div>
                                 )}
@@ -1472,7 +1471,7 @@ export default function CalculatorPage() {
                               <div className="flex items-center justify-between text-xs sm:text-sm">
                                 <span className="text-slate-500 font-medium">Subtotal:</span>
                                 <span className="font-bold text-slate-800">
-                                  {(item.price * currentQty).toLocaleString()} Gralats
+                                  {formatDisplayNumber(item.price * currentQty)} Gralats
                                 </span>
                               </div>
                             </div>
