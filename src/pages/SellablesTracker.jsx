@@ -574,7 +574,9 @@ export default function SellablesTracker() {
                     placeholder="Enter quantity"
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 font-semibold transition-all"
                   />
-                  <p className="text-xs text-slate-500 mt-1">Enter numbers</p>
+                  <p className="text-xs text-red-500 mt-1">
+                    You can input expressions like 200+400 for items with the same price
+                  </p>
                 </div>
 
                 <div>
