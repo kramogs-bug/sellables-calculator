@@ -4,10 +4,9 @@
   "version": "0.0.0",
   "type": "module",
 
-  "scripts": {
+"scripts": {
     "dev": "vite",
-    "build": "vite build --emptyOutDir",
-    "lint": "eslint .",
+    "build": "vite build",
     "preview": "vite preview"
   },
 
