@@ -72,6 +72,7 @@ export default function SellablesTracker() {
   const [goalAmount, setGoalAmount] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const [expandedDates, setExpandedDates] = useState({});
+  const [showQuantityMessage, setShowQuantityMessage] = useState(true);
   const [deleteModal, setDeleteModal] = useState({
     isOpen: false,
     entryId: null,
@@ -571,12 +572,16 @@ export default function SellablesTracker() {
                     type="text"
                     value={quantity}
                     onChange={(e) => handleNumberInputChange(e.target.value, setQuantity)}
+                    onFocus={() => setShowQuantityMessage(false)}
+                    onBlur={() => setShowQuantityMessage(true)}
                     placeholder="Enter quantity"
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 font-semibold transition-all"
                   />
-                  <p className="text-xs text-red-500 mt-1">
-                    You can input expressions like 200+400 for items with the same price
-                  </p>
+                  {showQuantityMessage && (
+                    <p className="text-xs text-red-500 mt-1">
+                      You can input expressions like 200+400 for items with the same price
+                    </p>
+                  )}
                 </div>
 
                 <div>
