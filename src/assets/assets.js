@@ -37,8 +37,8 @@ import success7 from './success7.png';
 import success8 from './success8.png';
 import success9 from './success9.png';
 import profile from './profile.png';
-
-
+import tracker_icon from './tracker_icon.png';
+import mushrooms from './mushrooms.png';
 // Export all icons as an object
 export const sellablesIcons = {
   aero: aeroNobg,
@@ -78,7 +78,9 @@ export const sellablesIcons = {
     8: success8,
     9: success9
   },
-  profile: profile
+  profile: profile,
+  tracker_icon: tracker_icon,
+  mushrooms: mushrooms
 
 };
 
@@ -119,7 +121,9 @@ export {
   success7,
   success8,
   success9,
-  profile
+  profile,
+  tracker_icon,
+  mushrooms
 };
 
 // Default export
