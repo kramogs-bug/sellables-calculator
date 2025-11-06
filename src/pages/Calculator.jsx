@@ -786,6 +786,7 @@ export default function CalculatorPage() {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [focusedItems, setFocusedItems] = useState({});
 
   // Save state whenever it changes
   useEffect(() => {
@@ -1391,7 +1392,7 @@ export default function CalculatorPage() {
                         const currentQty = quantities[item.name] || 0;
                         const currentInput = inputValues[item.name] !== undefined ? inputValues[item.name] : '';
                         const isExpression = currentInput && /[+\-*/()]/.test(currentInput);
-                        const [showMessage, setShowMessage] = useState(true);
+                        const showMessage = !focusedItems[item.name];
                         
                         return (
                           <div
@@ -1427,10 +1428,10 @@ export default function CalculatorPage() {
                                   type="text"
                                   value={currentInput}
                                   onChange={(e) => handleQuantityChangeWrapper(item.name, e.target.value)}
-                                  onFocus={() => setShowMessage(false)}
+                                  onFocus={() => setFocusedItems(prev => ({ ...prev, [item.name]: true }))}
                                   onBlur={() => {
                                     handleQuantityBlurWrapper(item.name);
-                                    setShowMessage(true);
+                                    setFocusedItems(prev => ({ ...prev, [item.name]: false }));
                                   }}
                                   onKeyPress={(e) => {
                                     if (e.key === 'Enter') {
@@ -1458,7 +1459,7 @@ export default function CalculatorPage() {
                               </button>
                             </div>
 
-                            {/* Red message for expression input */}
+                            {/* Red message for expression input - always visible now */}
                             {showMessage && (
                               <div className="mt-2">
                                 <p className="text-xs text-red-500 text-center">
