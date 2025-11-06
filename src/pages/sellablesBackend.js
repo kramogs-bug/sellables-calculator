@@ -1,4 +1,21 @@
-// sellablesBackend.js
+// Helper function to evaluate expressions
+export const evaluateExpression = (expression) => {
+  if (!expression) return 0;
+  
+  try {
+    // Remove any spaces and only allow numbers and basic operators
+    const cleanExpression = expression.replace(/[^\d+\-*/().]/g, '');
+    
+    // Use Function constructor for safe evaluation
+    const result = new Function(`return ${cleanExpression}`)();
+    
+    // Ensure result is a valid number
+    return isNaN(result) ? 0 : Math.max(0, result);
+  } catch (error) {
+    console.error('Error evaluating expression:', error);
+    return 0;
+  }
+};
 
 // Helper function to format numbers with commas
 export const formatNumber = (num) => {
@@ -31,25 +48,41 @@ export const formatCurrency = (num) => {
 // Helper function to parse formatted numbers back to raw numbers
 export const parseFormattedNumber = (formattedNum) => {
   if (!formattedNum) return '';
+  
+  // If it's an expression, return as is (without comma removal)
+  if (/[+\-*/().]/.test(formattedNum)) {
+    return formattedNum;
+  }
+  
   return formattedNum.replace(/,/g, '');
 };
 
 // Helper function to handle input changes with formatting
 export const handleNumberInputChange = (value, setter) => {
-  const cleaned = value.replace(/[^\d.]/g, '');
+  // Allow numbers, basic operators, and parentheses
+  const cleaned = value.replace(/[^\d+\-*/().]/g, '');
   
-  const parts = cleaned.split('.');
-  if (parts.length > 2) {
-    value = parts[0] + '.' + parts.slice(1).join('');
-  } else {
-    value = cleaned;
-  }
+  // Check if it's an expression (contains operators)
+  const isExpression = /[+\-*/().]/.test(cleaned);
   
-  if (value === '' || value === '.') {
-    setter(value);
+  if (isExpression) {
+    // For expressions, don't format, just set the raw value
+    setter(cleaned);
   } else {
-    const formatted = formatNumber(value);
-    setter(formatted);
+    // For regular numbers, format with commas
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      value = parts[0] + '.' + parts.slice(1).join('');
+    } else {
+      value = cleaned;
+    }
+    
+    if (value === '' || value === '.') {
+      setter(value);
+    } else {
+      const formatted = formatNumber(value);
+      setter(formatted);
+    }
   }
 };
 
@@ -156,12 +189,14 @@ export const createEntry = (selectedItem, quantity, note, getItemDetails) => {
   const itemDetails = getItemDetails(selectedItem);
   if (!itemDetails) return null;
 
+  const evaluatedQuantity = evaluateExpression(parseFormattedNumber(quantity));
+
   return {
     id: Date.now(),
     itemName: selectedItem,
-    quantity: parseInt(parseFormattedNumber(quantity)),
+    quantity: evaluatedQuantity,
     price: itemDetails.price,
-    total: itemDetails.price * parseInt(parseFormattedNumber(quantity)),
+    total: itemDetails.price * evaluatedQuantity,
     icon: itemDetails.icon,
     note: note,
     date: new Date().toISOString(),
@@ -175,14 +210,16 @@ export const updateEntry = (entries, editingId, selectedItem, quantity, note, ge
   const itemDetails = getItemDetails(selectedItem);
   if (!itemDetails) return entries;
 
+  const evaluatedQuantity = evaluateExpression(parseFormattedNumber(quantity));
+
   return entries.map(entry => 
     entry.id === editingId 
       ? {
           ...entry,
           itemName: selectedItem,
-          quantity: parseInt(parseFormattedNumber(quantity)),
+          quantity: evaluatedQuantity,
           price: itemDetails.price,
-          total: itemDetails.price * parseInt(parseFormattedNumber(quantity)),
+          total: itemDetails.price * evaluatedQuantity,
           icon: itemDetails.icon,
           note: note,
         }
@@ -199,7 +236,7 @@ export const deleteEntry = (entries, entryId) => {
 export const calculatePreviewTotal = (selectedItem, quantity, getItemDetails) => {
   if (!selectedItem || !quantity) return 0;
   const itemDetails = getItemDetails(selectedItem);
-  const parsedQuantity = parseInt(parseFormattedNumber(quantity)) || 0;
+  const parsedQuantity = evaluateExpression(parseFormattedNumber(quantity)) || 0;
   return (itemDetails?.price || 0) * parsedQuantity;
 };
 
