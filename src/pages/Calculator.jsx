@@ -787,6 +787,9 @@ export default function CalculatorPage() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [focusedItems, setFocusedItems] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFilters, setSelectedFilters] = useState([]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   // Save state whenever it changes
   useEffect(() => {
@@ -954,6 +957,52 @@ export default function CalculatorPage() {
       icon: sellablesIcons.flowers,
       bgColor: "bg-pink-500/10",
     }
+  };
+
+  // Filter categories and items based on search and filter
+  const getFilteredCategories = () => {
+    const filtered = {};
+    
+    Object.entries(categories).forEach(([categoryKey, category]) => {
+      // Apply category filter - if filters selected, only show those categories
+      if (selectedFilters.length > 0 && !selectedFilters.includes(categoryKey)) {
+        return;
+      }
+
+      // Filter items by search query
+      const filteredItems = sellableItems[categoryKey]?.filter(item => 
+        item.name.toLowerCase().includes(searchQuery.toLowerCase())
+      ) || [];
+
+      // Only include category if it has matching items
+      if (filteredItems.length > 0) {
+        filtered[categoryKey] = {
+          ...category,
+          items: filteredItems
+        };
+      }
+    });
+
+    return filtered;
+  };
+
+  const filteredCategories = getFilteredCategories();
+
+  // Toggle filter selection
+  const toggleFilter = (filterKey) => {
+    setSelectedFilters(prev => {
+      if (prev.includes(filterKey)) {
+        return prev.filter(f => f !== filterKey);
+      } else {
+        return [...prev, filterKey];
+      }
+    });
+  };
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setSelectedFilters([]);
+    setSearchQuery('');
   };
 
   // Show Tro Converter if enabled
@@ -1355,7 +1404,188 @@ export default function CalculatorPage() {
 
         {/* Categories */}
         <div className="space-y-4 mb-20">
-          {Object.entries(categories).map(([categoryKey, category]) => {
+          {/* Modern Search and Filter Bar */}
+          <div className="bg-gradient-to-br from-white via-slate-50 to-white rounded-2xl shadow-xl border border-slate-200/60 p-6">
+            <div className="flex flex-col gap-4">
+              {/* Search and Toggle Header */}
+              <div className="flex items-center gap-4">
+                {/* Search Input */}
+                <div className="flex-1 relative group">
+                  <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                    <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg group-focus-within:scale-110 transition-transform duration-300">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search items"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-20 pr-14 py-4 text-slate-900 text-lg font-medium bg-white border-2 border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all duration-300 shadow-sm hover:shadow-md placeholder:text-slate-400"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute inset-y-0 right-0 mr-3 flex items-center justify-center w-10 h-10 bg-slate-100 hover:bg-red-100 text-slate-500 hover:text-red-600 rounded-xl transition-all duration-300 hover:scale-105"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                {/* Toggle Filters Button */}
+                <button
+                  onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  className="flex items-center gap-2 px-4 py-4 bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 hover:from-green-600 hover:via-emerald-600 hover:to-teal-600 text-white font-semibold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
+                  </svg>
+                  <span className="hidden sm:inline">Filters</span>
+                  <svg className={`w-4 h-4 transition-transform duration-300 ${isFilterOpen ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Collapsible Filter Section */}
+              {isFilterOpen && (
+                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex flex-col gap-3 pt-4 border-t border-slate-200">
+                    {/* Filter Header */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-700">Filter by Category</span>
+                        {selectedFilters.length > 0 && (
+                          <span className="px-2 py-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs font-bold rounded-full">
+                            {selectedFilters.length}
+                          </span>
+                        )}
+                      </div>
+                      {selectedFilters.length > 0 && (
+                        <button
+                          onClick={clearAllFilters}
+                          className="flex items-center gap-1 px-3 py-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-medium rounded-lg transition-colors"
+                        >
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                          Clear All
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Filter Buttons Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                      {Object.entries(categories).map(([key, category]) => {
+                        const isSelected = selectedFilters.includes(key);
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => toggleFilter(key)}
+                            className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 ${
+                              isSelected
+                                ? 'bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 text-white border-emerald-500 shadow-lg scale-105'
+                                : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50'
+                            }`}
+                          >
+                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${
+                              isSelected ? 'bg-white/20' : 'bg-slate-100'
+                            }`}>
+                              <img src={category.icon} alt={category.name} className="w-4 h-4 object-contain" />
+                            </div>
+                            <span className="text-sm font-medium truncate flex-1 text-left">{category.name}</span>
+                            {isSelected && (
+                              <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Active Filters & Results - Always Visible */}
+              {(selectedFilters.length > 0 || searchQuery) && (
+                <div className="pt-3 border-t border-slate-200">
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Active Filters */}
+                    {selectedFilters.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-600">Active:</span>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedFilters.map(filterKey => (
+                            <span
+                              key={filterKey}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 text-white text-xs font-medium rounded-lg"
+                            >
+                              <img src={categories[filterKey].icon} alt={categories[filterKey].name} className="w-3 h-3" />
+                              {categories[filterKey].name}
+                              <button
+                                onClick={() => toggleFilter(filterKey)}
+                                className="hover:bg-white/20 rounded-full p-0.5 transition-colors"
+                              >
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Results Count */}
+                    <div className="flex items-center gap-2 ml-auto">
+                      <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-sm text-slate-700">
+                        <span className="font-bold text-emerald-600">{Object.keys(filteredCategories).length}</span> categories
+                        {searchQuery && (
+                          <span className="text-slate-500">
+                            {' '}matching "<span className="font-semibold text-slate-700">{searchQuery}</span>"
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* No Results Message */}
+          {Object.keys(filteredCategories).length === 0 && (
+            <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+                <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-slate-800 mb-3">No items found</h3>
+              <p className="text-slate-600 mb-6 max-w-md mx-auto">
+                {searchQuery 
+                  ? `We couldn't find any sellables matching "${searchQuery}". Try adjusting your search or filters.`
+                  : 'No items match your selected filters. Try selecting different categories.'}
+              </p>
+              <button
+                onClick={clearAllFilters}
+                className="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
+              >
+                Clear All Filters
+              </button>
+            </div>
+          )}
+
+          {Object.entries(filteredCategories).map(([categoryKey, category]) => {
             const categoryTotal = categoryTotals[categoryKey] || 0;
 
             return (
@@ -1370,7 +1600,7 @@ export default function CalculatorPage() {
                     </div>
                     <div className="text-left">
                       <h2 className="text-lg sm:text-xl font-semibold text-slate-800">{category.name}</h2>
-                      <p className="text-xs sm:text-sm text-slate-500">{sellableItems[categoryKey].length} items</p>
+                      <p className="text-xs sm:text-sm text-slate-500">{category.items.length} items</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 sm:gap-4">
@@ -1384,11 +1614,11 @@ export default function CalculatorPage() {
                 {expandedCategories[categoryKey] && (
                   <div className="px-4 sm:px-6 py-4 border-t border-slate-200">
                     <div className={`grid grid-cols-1 gap-3 sm:gap-4 ${
-                      sellableItems[categoryKey].length === 1 
+                      category.items.length === 1 
                         ? 'sm:grid-cols-1 sm:max-w-md sm:mx-auto' 
                         : 'sm:grid-cols-2'
                     }`}>
-                      {sellableItems[categoryKey].map((item) => {
+                      {category.items.map((item) => {
                         const currentQty = quantities[item.name] || 0;
                         const currentInput = inputValues[item.name] !== undefined ? inputValues[item.name] : '';
                         const isExpression = currentInput && /[+\-*/()]/.test(currentInput);
