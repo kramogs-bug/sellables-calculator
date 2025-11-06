@@ -1,4 +1,3 @@
-// SellablesTracker.jsx
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Save, X, TrendingUp, TrendingDown, Target, Calendar, Clock, DollarSign, BarChart3, ChevronDown, History, AlertTriangle } from 'lucide-react';
 import { sellablesIcons } from "../assets/assets.js";
@@ -7,6 +6,7 @@ import {
   formatCurrency,
   handleNumberInputChange,
   parseFormattedNumber,
+  evaluateExpression,
   calculateStatistics,
   groupEntriesByDate,
   calculateGoalProgress,
@@ -568,15 +568,25 @@ export default function SellablesTracker() {
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
                     Quantity
                   </label>
-                  <input
-                    type="text"
-                    value={quantity}
-                    onChange={(e) => handleNumberInputChange(e.target.value, setQuantity)}
-                    onFocus={() => setShowQuantityMessage(false)}
-                    onBlur={() => setShowQuantityMessage(true)}
-                    placeholder="Enter quantity"
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 font-semibold transition-all"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={quantity}
+                      onChange={(e) => handleNumberInputChange(e.target.value, setQuantity)}
+                      onFocus={() => setShowQuantityMessage(false)}
+                      onBlur={() => setShowQuantityMessage(true)}
+                      placeholder="Enter quantity or expression like 200+400"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 font-semibold transition-all"
+                    />
+                    {/* Show evaluated result for expressions */}
+                    {quantity && /[+\-*/().]/.test(quantity.replace(/,/g, '')) && (
+                      <div className="absolute -bottom-6 left-0 right-0">
+                        <p className="text-xs text-green-600 font-medium text-center">
+                          = {formatNumber(evaluateExpression(parseFormattedNumber(quantity)))} items
+                        </p>
+                      </div>
+                    )}
+                  </div>
                   {showQuantityMessage && (
                     <p className="text-xs text-red-500 mt-1">
                       You can input expressions like 200+400 for items with the same price
@@ -613,7 +623,14 @@ export default function SellablesTracker() {
                       </div>
                       <div>
                         <p className="font-semibold text-slate-800">{selectedItem}</p>
-                        <p className="text-sm text-slate-500">× {formatNumber(quantity)}</p>
+                        <p className="text-sm text-slate-500">
+                          × {formatNumber(evaluateExpression(parseFormattedNumber(quantity)))} 
+                          {/[+\-*/().]/.test(quantity.replace(/,/g, '')) && (
+                            <span className="text-xs text-green-600 ml-1">
+                              (from {quantity})
+                            </span>
+                          )}
+                        </p>
                       </div>
                     </div>
                     <div className="text-right">
