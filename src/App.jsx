@@ -5,6 +5,7 @@ import Calculator from './pages/Calculator';
 import SellablesTracker from './pages/SellablesTracker';
 import About from './pages/About';
 import './index.css';
+import GraalCodesModern from './pages/GraalCodesModern.jsx';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/calculator" element={<Calculator />} />
         <Route path="/tracker" element={<SellablesTracker />} />
         <Route path="/about" element={<About />} />
+        <Route path="/codes" element={<GraalCodesModern />} />
       </Routes>
     </Router>
   );
