@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Home, Info, BarChart3 } from 'lucide-react';
+import { Menu, X, Home, Info, BarChart3, Code } from 'lucide-react';
 import { useState } from 'react';
 import { sellablesIcons } from '../assets/assets.js';
 
@@ -81,6 +81,17 @@ export default function Navbar() {
             >
               <BarChart3 size={20} className="transition-transform duration-300 group-hover:rotate-12" />
               <span>Tracker</span>
+            </Link>
+            <Link 
+              to="/codes" 
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 font-semibold transform hover:scale-105 ${
+                isActive('/codes') 
+                  ? 'bg-blue-500 text-white shadow-lg scale-105' 
+                  : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600 hover:shadow-md'
+              }`}
+            >
+              <Code size={20} className="transition-transform duration-300 group-hover:rotate-12" />
+              <span>Codes</span>
             </Link>
             <Link 
               to="/about" 
@@ -173,6 +184,18 @@ export default function Navbar() {
           >
             <BarChart3 size={20} />
             <span>Tracker</span>
+          </Link>
+          <Link 
+            to="/codes" 
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 font-semibold transform hover:scale-105 hover:translate-x-2 ${
+              isActive('/codes') 
+                ? 'bg-blue-500 text-white shadow-lg scale-105' 
+                : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600'
+            }`}
+            onClick={() => setIsOpen(false)}
+          >
+            <Code size={20} />
+            <span>Codes</span>
           </Link>
           <Link 
             to="/about" 
