@@ -4,7 +4,7 @@ import Home from './pages/Home';
 import Calculator from './pages/Calculator';
 import SellablesTracker from './pages/SellablesTracker';
 import About from './pages/About';
-import './App.css';
+import './index.css';
 
 function App() {
   return (
