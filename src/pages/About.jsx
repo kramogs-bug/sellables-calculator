@@ -3,7 +3,6 @@ import { sellablesIcons } from '../assets/assets'; // Import your assets
 
 export default function About() {
   const [activeService, setActiveService] = useState(0);
-  const [selectedImage, setSelectedImage] = useState(null);
 
   const projects = [
     {
@@ -92,19 +91,6 @@ export default function About() {
     }
   ];
 
-  // FIXED: Use imported images instead of string paths
-  const vouchPhotos = [
-    { id: 1, image: sellablesIcons.successImages[1] },
-    { id: 2, image: sellablesIcons.successImages[2] },
-    { id: 3, image: sellablesIcons.successImages[3] },
-    { id: 4, image: sellablesIcons.successImages[4] },
-    { id: 5, image: sellablesIcons.successImages[5] },
-    { id: 6, image: sellablesIcons.successImages[6] },
-    { id: 7, image: sellablesIcons.successImages[7] },
-    { id: 8, image: sellablesIcons.successImages[8] },
-    { id: 9, image: sellablesIcons.successImages[9] }
-  ];
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
       {/* Animated Background Elements */}
@@ -118,7 +104,6 @@ export default function About() {
         <div className="text-center mb-20">
           <div className="relative inline-block mb-8">
             <div className="w-32 h-32 rounded-full flex items-center justify-center shadow-2xl shadow-blue-500/50 overflow-hidden border-4 border-gradient-to-br from-blue-500 via-purple-500 to-pink-500">
-              {/* FIXED: Use imported profile image */}
               <img 
                 src={sellablesIcons.profile} 
                 alt="Profile" 
@@ -146,7 +131,7 @@ export default function About() {
           <div className="flex justify-center gap-4 flex-wrap">
             {contactMethods.map((method, index) => (
               <a
-                key={index} // FIXED: Added missing key prop
+                key={index}
                 href={method.link}
                 className="group flex items-center gap-3 px-6 py-3 bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 hover:border-blue-500 transition-all duration-300 hover:scale-105 text-slate-300 hover:text-white shadow-lg hover:shadow-blue-500/20"
                 target="_blank"
@@ -164,7 +149,6 @@ export default function About() {
           <div className="bg-slate-800/30 backdrop-blur-xl rounded-3xl border border-slate-700 p-8 sm:p-12 shadow-2xl">
             <div className="flex items-center gap-4 mb-8">
               <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-blue-500 flex-shrink-0">
-                {/* FIXED: Use imported profile image */}
                 <img 
                   src={sellablesIcons.profile} 
                   alt="Profile" 
@@ -178,7 +162,6 @@ export default function About() {
               <h2 className="text-4xl font-bold text-white">About Me</h2>
             </div>
             
-            {/* Rest of the component remains the same... */}
             <div className="space-y-6 text-slate-300 text-lg leading-relaxed">
               <p>
                 I'm a passionate developer specializing in game automation, macro development, and full-stack web applications. 
@@ -398,86 +381,6 @@ export default function About() {
                   </div>
                 ))}
               </div>
-
-              {/* Proof Section */}
-              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-white/10 mb-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-yellow-500/20 rounded-xl flex items-center justify-center">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="text-yellow-400">
-                      <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
-                    </svg>
-                  </div>
-                  <h3 className="text-2xl font-bold text-white">Client Success Stories</h3>
-                </div>
-                <p className="text-blue-200 mb-6">Proven results from successful automation projects and satisfied clients (Click to view full size)</p>
-                
-                <div className="relative">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-blue-500/50 scrollbar-track-white/5">
-                    {vouchPhotos.map((photo) => (
-                      <div 
-                        key={photo.id} 
-                        onClick={() => setSelectedImage(photo)}
-                        className="group relative bg-white/5 rounded-xl border border-white/10 overflow-hidden hover:scale-105 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 cursor-pointer"
-                      >
-                        <img 
-                          src={photo.image} 
-                          alt={`Success Story ${photo.id}`}
-                          className="w-full h-auto object-contain"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            const fallback = document.createElement('div');
-                            fallback.className = 'absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 flex flex-col items-center justify-center text-white aspect-video';
-                            fallback.innerHTML = `
-                              <svg width="32" height="32" viewBox="0 0 24 24" fill="white" class="mb-2 opacity-50">
-                                <path d="M19 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h4l3 3 3-3h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 3.3c1.49 0 2.7 1.21 2.7 2.7 0 1.49-1.21 2.7-2.7 2.7-1.49 0-2.7-1.21-2.7-2.7 0-1.49 1.21-2.7 2.7-2.7zM18 16H6v-.9c0-2 4-3.1 6-3.1s6 1.1 6 3.1v.9z"/>
-                              </svg>
-                              <span class="font-bold text-sm">Success #${photo.id}</span>
-                            `;
-                            e.target.parentElement.appendChild(fallback);
-                          }}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                          <div className="text-center">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="white" className="mx-auto mb-1">
-                              <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-                            </svg>
-                            <span className="text-white font-semibold text-sm">Click to view</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {vouchPhotos.length > 6 && (
-                    <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white/10 to-transparent pointer-events-none rounded-b-2xl"></div>
-                  )}
-                </div>
-              </div>
-
-              {/* Image Modal */}
-              {selectedImage && (
-                <div 
-                  className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                  onClick={() => setSelectedImage(null)}
-                >
-                  <button
-                    onClick={() => setSelectedImage(null)}
-                    className="absolute top-4 right-4 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors z-50"
-                  >
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                  </button>
-                  <div className="relative max-w-6xl max-h-[90vh]">
-                    <img 
-                      src={selectedImage.image} 
-                      alt={`Success Story ${selectedImage.id}`}
-                      className="max-w-full max-h-[90vh] w-auto h-auto rounded-xl shadow-2xl"
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </div>
-                </div>
-              )}
 
               <div className="text-center">
                 <a
