@@ -76,6 +76,7 @@ export default function SellablesTracker() {
   const [expandedDates, setExpandedDates] = useState({});
   const [showQuantityMessage, setShowQuantityMessage] = useState(true);
   const [chartTimeframe, setChartTimeframe] = useState('7days'); // '7days', '30days', '12months'
+  const [averageTimeframe, setAverageTimeframe] = useState('7days'); // '7days', '30days', '12months'
   const [deleteModal, setDeleteModal] = useState({
     isOpen: false,
     entryId: null,
@@ -190,6 +191,41 @@ export default function SellablesTracker() {
   const dailyTotals = groupEntriesByDate(entries);
   const goalProgress = calculateGoalProgress(goal, statistics.totalEarned);
   const previewTotal = calculatePreviewTotal(selectedItem, quantity, getItemDetails);
+
+  // Calculate average based on selected timeframe
+  const calculateAverage = () => {
+    const now = new Date();
+    let filteredEntries = [];
+    let days = 0;
+
+    if (averageTimeframe === '7days') {
+      days = 7;
+      filteredEntries = entries.filter(entry => {
+        const entryDate = new Date(entry.date);
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        return entryDate >= weekAgo;
+      });
+    } else if (averageTimeframe === '30days') {
+      days = 30;
+      filteredEntries = entries.filter(entry => {
+        const entryDate = new Date(entry.date);
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        return entryDate >= monthAgo;
+      });
+    } else if (averageTimeframe === '12months') {
+      days = 365;
+      filteredEntries = entries.filter(entry => {
+        const entryDate = new Date(entry.date);
+        const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        return entryDate >= yearAgo;
+      });
+    }
+
+    const total = filteredEntries.reduce((sum, entry) => sum + entry.total, 0);
+    return days > 0 ? (total / days).toFixed(2) : 0;
+  };
+
+  const avgValue = calculateAverage();
 
   // Prepare chart data based on selected timeframe
   const chartData = (() => {
@@ -421,16 +457,49 @@ export default function SellablesTracker() {
                 <TrendingUp className="text-white" size={24} />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">7-Day Average</p>
+                <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
+                  {averageTimeframe === '7days' && '7-Day Average'}
+                  {averageTimeframe === '30days' && '30-Day Average'}
+                  {averageTimeframe === '12months' && 'Yearly Average'}
+                </p>
                 <p className="text-2xl font-bold text-slate-800">
-                  {formatCurrency(statistics.avgDaily)}
+                  {formatCurrency(avgValue)}
                 </p>
               </div>
             </div>
             <div className="bg-purple-50 rounded-lg p-3 border border-purple-100">
-              <p className="text-xs text-purple-700 font-medium text-center">
-                Average daily earnings
-              </p>
+              <div className="flex gap-2 justify-center flex-wrap">
+                <button
+                  onClick={() => setAverageTimeframe('7days')}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                    averageTimeframe === '7days'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white text-purple-600 hover:bg-purple-100'
+                  }`}
+                >
+                  7D
+                </button>
+                <button
+                  onClick={() => setAverageTimeframe('30days')}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                    averageTimeframe === '30days'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white text-purple-600 hover:bg-purple-100'
+                  }`}
+                >
+                  30D
+                </button>
+                <button
+                  onClick={() => setAverageTimeframe('12months')}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                    averageTimeframe === '12months'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white text-purple-600 hover:bg-purple-100'
+                  }`}
+                >
+                  1Y
+                </button>
+              </div>
             </div>
           </div>
         </div>
