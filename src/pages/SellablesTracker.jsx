@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Save, X, TrendingUp, TrendingDown, Target, Calendar, Clock, DollarSign, BarChart3, ChevronDown, History, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, TrendingUp, TrendingDown, Target, Calendar, Clock, DollarSign, BarChart3, ChevronDown, History, AlertTriangle, Activity } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import { sellablesIcons } from "../assets/assets.js";
 import {
   formatNumber,
@@ -188,6 +189,48 @@ export default function SellablesTracker() {
   const goalProgress = calculateGoalProgress(goal, statistics.totalEarned);
   const previewTotal = calculatePreviewTotal(selectedItem, quantity, getItemDetails);
 
+  // Prepare chart data (last 7 days)
+  const chartData = (() => {
+    const last7Days = [];
+    const now = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      
+      const dayEntries = entries.filter(entry => {
+        const entryDate = new Date(entry.date).toDateString();
+        return entryDate === date.toDateString();
+      });
+      
+      const total = dayEntries.reduce((sum, entry) => sum + entry.total, 0);
+      
+      last7Days.push({
+        date: dateStr,
+        total: total,
+        fullDate: date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+      });
+    }
+    
+    return last7Days;
+  })();
+
+  // Custom tooltip for chart
+  const CustomTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white border-2 border-slate-200 rounded-xl shadow-xl p-4">
+          <p className="text-sm font-semibold text-slate-600 mb-1">{payload[0].payload.fullDate}</p>
+          <p className="text-lg font-bold text-emerald-600">
+            {formatNumber(payload[0].value)} G
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
       {/* Delete Confirmation Modal */}
@@ -332,6 +375,57 @@ export default function SellablesTracker() {
             </div>
           </div>
         </div>
+
+        {/* Trending Chart */}
+        {entries.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
+                <Activity className="text-white" size={24} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">Earnings Trend</h2>
+                <p className="text-sm text-slate-500">Last 7 days performance</p>
+              </div>
+            </div>
+
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <XAxis 
+                  dataKey="date" 
+                  stroke="#64748b"
+                  style={{ fontSize: '12px', fontWeight: '500' }}
+                  tickLine={false}
+                  axisLine={{ stroke: '#e2e8f0' }}
+                />
+                <YAxis 
+                  stroke="#64748b"
+                  style={{ fontSize: '12px', fontWeight: '500' }}
+                  tickLine={false}
+                  axisLine={{ stroke: '#e2e8f0' }}
+                  tickFormatter={(value) => formatNumber(value)}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Area 
+                  type="monotone" 
+                  dataKey="total" 
+                  stroke="#10b981" 
+                  strokeWidth={3}
+                  fill="url(#colorTotal)"
+                  dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6, strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
 
         {/* Goal Tracker */}
         {goal.active ? (
