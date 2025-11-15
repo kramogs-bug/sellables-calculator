@@ -1,3 +1,4 @@
+// SellablesTracker.jsx
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Save, X, TrendingUp, TrendingDown, Target, Calendar, Clock, DollarSign, BarChart3, ChevronDown, History, AlertTriangle, Activity } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
@@ -74,6 +75,7 @@ export default function SellablesTracker() {
   const [targetDate, setTargetDate] = useState('');
   const [expandedDates, setExpandedDates] = useState({});
   const [showQuantityMessage, setShowQuantityMessage] = useState(true);
+  const [chartTimeframe, setChartTimeframe] = useState('7days'); // '7days', '30days', '12months'
   const [deleteModal, setDeleteModal] = useState({
     isOpen: false,
     entryId: null,
@@ -189,31 +191,83 @@ export default function SellablesTracker() {
   const goalProgress = calculateGoalProgress(goal, statistics.totalEarned);
   const previewTotal = calculatePreviewTotal(selectedItem, quantity, getItemDetails);
 
-  // Prepare chart data (last 7 days)
+  // Prepare chart data based on selected timeframe
   const chartData = (() => {
-    const last7Days = [];
     const now = new Date();
     
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(now);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      
-      const dayEntries = entries.filter(entry => {
-        const entryDate = new Date(entry.date).toDateString();
-        return entryDate === date.toDateString();
-      });
-      
-      const total = dayEntries.reduce((sum, entry) => sum + entry.total, 0);
-      
-      last7Days.push({
-        date: dateStr,
-        total: total,
-        fullDate: date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-      });
+    if (chartTimeframe === '7days') {
+      // Last 7 days
+      const last7Days = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        
+        const dayEntries = entries.filter(entry => {
+          const entryDate = new Date(entry.date).toDateString();
+          return entryDate === date.toDateString();
+        });
+        
+        const total = dayEntries.reduce((sum, entry) => sum + entry.total, 0);
+        
+        last7Days.push({
+          date: dateStr,
+          total: total,
+          fullDate: date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+        });
+      }
+      return last7Days;
+    } else if (chartTimeframe === '30days') {
+      // Last 30 days
+      const last30Days = [];
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        
+        const dayEntries = entries.filter(entry => {
+          const entryDate = new Date(entry.date).toDateString();
+          return entryDate === date.toDateString();
+        });
+        
+        const total = dayEntries.reduce((sum, entry) => sum + entry.total, 0);
+        
+        last30Days.push({
+          date: dateStr,
+          total: total,
+          fullDate: date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+        });
+      }
+      return last30Days;
+    } else if (chartTimeframe === '12months') {
+      // Last 12 months
+      const last12Months = [];
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date(now);
+        date.setMonth(date.getMonth() - i);
+        const monthStr = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        
+        const monthEntries = entries.filter(entry => {
+          const entryDate = new Date(entry.date);
+          return entryDate.getMonth() === date.getMonth() && 
+                 entryDate.getFullYear() === date.getFullYear();
+        });
+        
+        const total = monthEntries.reduce((sum, entry) => sum + entry.total, 0);
+        const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+        const average = total / daysInMonth;
+        
+        last12Months.push({
+          date: monthStr,
+          total: total,
+          average: average,
+          fullDate: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        });
+      }
+      return last12Months;
     }
     
-    return last7Days;
+    return [];
   })();
 
   // Custom tooltip for chart
@@ -225,6 +279,11 @@ export default function SellablesTracker() {
           <p className="text-lg font-bold text-emerald-600">
             {formatNumber(payload[0].value)} G
           </p>
+          {chartTimeframe === '12months' && payload[0].payload.average && (
+            <p className="text-xs text-slate-500 mt-1">
+              Daily Avg: {formatCurrency(payload[0].payload.average)} G
+            </p>
+          )}
         </div>
       );
     }
@@ -379,13 +438,53 @@ export default function SellablesTracker() {
         {/* Trending Chart */}
         {entries.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
-                <Activity className="text-white" size={24} />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
+                  <Activity className="text-white" size={24} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800">Earnings Trend</h2>
+                  <p className="text-sm text-slate-500">
+                    {chartTimeframe === '7days' && 'Last 7 days performance'}
+                    {chartTimeframe === '30days' && 'Last 30 days performance'}
+                    {chartTimeframe === '12months' && 'Last 12 months performance'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-slate-800">Earnings Trend</h2>
-                <p className="text-sm text-slate-500">Last 7 days performance</p>
+              
+              {/* Timeframe Toggle */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setChartTimeframe('7days')}
+                  className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
+                    chartTimeframe === '7days'
+                      ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  7 Days
+                </button>
+                <button
+                  onClick={() => setChartTimeframe('30days')}
+                  className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
+                    chartTimeframe === '30days'
+                      ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  30 Days
+                </button>
+                <button
+                  onClick={() => setChartTimeframe('12months')}
+                  className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
+                    chartTimeframe === '12months'
+                      ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  12 Months
+                </button>
               </div>
             </div>
 
@@ -404,6 +503,9 @@ export default function SellablesTracker() {
                   style={{ fontSize: '12px', fontWeight: '500' }}
                   tickLine={false}
                   axisLine={{ stroke: '#e2e8f0' }}
+                  angle={chartTimeframe === '30days' ? -45 : 0}
+                  textAnchor={chartTimeframe === '30days' ? 'end' : 'middle'}
+                  height={chartTimeframe === '30days' ? 80 : 30}
                 />
                 <YAxis 
                   stroke="#64748b"
