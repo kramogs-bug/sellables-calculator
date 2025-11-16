@@ -1,7 +1,7 @@
 // SellablesTracker.jsx
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Save, X, TrendingUp, TrendingDown, Target, Calendar, Clock, DollarSign, BarChart3, ChevronDown, History, AlertTriangle, Activity } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import { sellablesIcons } from "../assets/assets.js";
 import {
   formatNumber,
@@ -76,6 +76,7 @@ export default function SellablesTracker() {
   const [expandedDates, setExpandedDates] = useState({});
   const [showQuantityMessage, setShowQuantityMessage] = useState(true);
   const [chartTimeframe, setChartTimeframe] = useState('7days'); // '7days', '30days', '12months'
+  const [chartType, setChartType] = useState('candlestick'); // 'candlestick', 'line'
   const [averageTimeframe, setAverageTimeframe] = useState('7days'); // '7days', '30days', '12months'
   const [deleteModal, setDeleteModal] = useState({
     isOpen: false,
@@ -227,7 +228,7 @@ export default function SellablesTracker() {
 
   const avgValue = calculateAverage();
 
-  // Prepare chart data based on selected timeframe
+  // Prepare candlestick chart data based on selected timeframe
   const chartData = (() => {
     const now = new Date();
     
@@ -245,10 +246,22 @@ export default function SellablesTracker() {
         });
         
         const total = dayEntries.reduce((sum, entry) => sum + entry.total, 0);
+        const prevDate = new Date(date);
+        prevDate.setDate(prevDate.getDate() - 1);
+        const prevDayEntries = entries.filter(entry => {
+          const entryDate = new Date(entry.date).toDateString();
+          return entryDate === prevDate.toDateString();
+        });
+        const prevTotal = prevDayEntries.reduce((sum, entry) => sum + entry.total, 0);
         
         last7Days.push({
           date: dateStr,
           total: total,
+          open: prevTotal || 0,
+          close: total,
+          high: Math.max(prevTotal || 0, total),
+          low: Math.min(prevTotal || 0, total),
+          isPositive: total >= (prevTotal || 0),
           fullDate: date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
         });
       }
@@ -267,10 +280,22 @@ export default function SellablesTracker() {
         });
         
         const total = dayEntries.reduce((sum, entry) => sum + entry.total, 0);
+        const prevDate = new Date(date);
+        prevDate.setDate(prevDate.getDate() - 1);
+        const prevDayEntries = entries.filter(entry => {
+          const entryDate = new Date(entry.date).toDateString();
+          return entryDate === prevDate.toDateString();
+        });
+        const prevTotal = prevDayEntries.reduce((sum, entry) => sum + entry.total, 0);
         
         last30Days.push({
           date: dateStr,
           total: total,
+          open: prevTotal || 0,
+          close: total,
+          high: Math.max(prevTotal || 0, total),
+          low: Math.min(prevTotal || 0, total),
+          isPositive: total >= (prevTotal || 0),
           fullDate: date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
         });
       }
@@ -293,9 +318,23 @@ export default function SellablesTracker() {
         const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
         const average = total / daysInMonth;
         
+        const prevDate = new Date(date);
+        prevDate.setMonth(prevDate.getMonth() - 1);
+        const prevMonthEntries = entries.filter(entry => {
+          const entryDate = new Date(entry.date);
+          return entryDate.getMonth() === prevDate.getMonth() && 
+                 entryDate.getFullYear() === prevDate.getFullYear();
+        });
+        const prevTotal = prevMonthEntries.reduce((sum, entry) => sum + entry.total, 0);
+        
         last12Months.push({
           date: monthStr,
           total: total,
+          open: prevTotal || 0,
+          close: total,
+          high: Math.max(prevTotal || 0, total),
+          low: Math.min(prevTotal || 0, total),
+          isPositive: total >= (prevTotal || 0),
           average: average,
           fullDate: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
         });
@@ -306,18 +345,65 @@ export default function SellablesTracker() {
     return [];
   })();
 
+  // Custom Candlestick component
+  const Candlestick = (props) => {
+    const { x, y, width, height, payload } = props;
+    const isPositive = payload.isPositive;
+    const candleWidth = Math.min(width * 0.6, 20);
+    const centerX = x + width / 2;
+    
+    return (
+      <g>
+        {/* Wick (line) */}
+        <line
+          x1={centerX}
+          y1={y}
+          x2={centerX}
+          y2={y + height}
+          stroke={isPositive ? '#10b981' : '#ef4444'}
+          strokeWidth={1.5}
+        />
+        {/* Body (rectangle) */}
+        <rect
+          x={centerX - candleWidth / 2}
+          y={y + height * 0.2}
+          width={candleWidth}
+          height={height * 0.6}
+          fill={isPositive ? '#10b981' : '#ef4444'}
+          stroke={isPositive ? '#059669' : '#dc2626'}
+          strokeWidth={1}
+          rx={2}
+        />
+      </g>
+    );
+  };
+
   // Custom tooltip for chart
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
+      const data = payload[0].payload;
       return (
         <div className="bg-white border-2 border-slate-200 rounded-xl shadow-xl p-4">
-          <p className="text-sm font-semibold text-slate-600 mb-1">{payload[0].payload.fullDate}</p>
-          <p className="text-lg font-bold text-emerald-600">
-            {formatNumber(payload[0].value)} G
-          </p>
-          {chartTimeframe === '12months' && payload[0].payload.average && (
-            <p className="text-xs text-slate-500 mt-1">
-              Daily Avg: {formatCurrency(payload[0].payload.average)} G
+          <p className="text-sm font-semibold text-slate-600 mb-2">{data.fullDate}</p>
+          <div className="space-y-1">
+            <div className="flex justify-between gap-4">
+              <span className="text-xs text-slate-500">Total:</span>
+              <span className="text-sm font-bold text-emerald-600">{formatNumber(data.close)} G</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-xs text-slate-500">Previous:</span>
+              <span className="text-sm font-semibold text-slate-700">{formatNumber(data.open)} G</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-xs text-slate-500">Change:</span>
+              <span className={`text-sm font-semibold ${data.isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                {data.isPositive ? '+' : ''}{formatNumber(data.close - data.open)} G
+              </span>
+            </div>
+          </div>
+          {chartTimeframe === '12months' && data.average && (
+            <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">
+              Daily Avg: {formatCurrency(data.average)} G
             </p>
           )}
         </div>
@@ -504,7 +590,7 @@ export default function SellablesTracker() {
           </div>
         </div>
 
-        {/* Trending Chart */}
+        {/* Candlestick/Line Chart */}
         {entries.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -522,78 +608,136 @@ export default function SellablesTracker() {
                 </div>
               </div>
               
-              {/* Timeframe Toggle */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setChartTimeframe('7days')}
-                  className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
-                    chartTimeframe === '7days'
-                      ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  7 Days
-                </button>
-                <button
-                  onClick={() => setChartTimeframe('30days')}
-                  className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
-                    chartTimeframe === '30days'
-                      ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  30 Days
-                </button>
-                <button
-                  onClick={() => setChartTimeframe('12months')}
-                  className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
-                    chartTimeframe === '12months'
-                      ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  12 Months
-                </button>
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                {/* Chart Type Toggle */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setChartType('candlestick')}
+                    className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
+                      chartType === 'candlestick'
+                        ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Candlestick
+                  </button>
+                  <button
+                    onClick={() => setChartType('line')}
+                    className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
+                      chartType === 'line'
+                        ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Line
+                  </button>
+                </div>
+                
+                {/* Timeframe Toggle */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setChartTimeframe('7days')}
+                    className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
+                      chartTimeframe === '7days'
+                        ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    7 Days
+                  </button>
+                  <button
+                    onClick={() => setChartTimeframe('30days')}
+                    className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
+                      chartTimeframe === '30days'
+                        ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    30 Days
+                  </button>
+                  <button
+                    onClick={() => setChartTimeframe('12months')}
+                    className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
+                      chartTimeframe === '12months'
+                        ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    12 Months
+                  </button>
+                </div>
               </div>
             </div>
 
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis 
-                  dataKey="date" 
-                  stroke="#64748b"
-                  style={{ fontSize: '12px', fontWeight: '500' }}
-                  tickLine={false}
-                  axisLine={{ stroke: '#e2e8f0' }}
-                  angle={chartTimeframe === '30days' ? -45 : 0}
-                  textAnchor={chartTimeframe === '30days' ? 'end' : 'middle'}
-                  height={chartTimeframe === '30days' ? 80 : 30}
-                />
-                <YAxis 
-                  stroke="#64748b"
-                  style={{ fontSize: '12px', fontWeight: '500' }}
-                  tickLine={false}
-                  axisLine={{ stroke: '#e2e8f0' }}
-                  tickFormatter={(value) => formatNumber(value)}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Area 
-                  type="monotone" 
-                  dataKey="total" 
-                  stroke="#10b981" 
-                  strokeWidth={3}
-                  fill="url(#colorTotal)"
-                  dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
-                  activeDot={{ r: 6, strokeWidth: 2 }}
-                />
-              </AreaChart>
+            <ResponsiveContainer width="100%" height={350}>
+              {chartType === 'candlestick' ? (
+                <ComposedChart data={chartData} margin={{ top: 20, right: 10, left: 0, bottom: chartTimeframe === '30days' ? 50 : 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="#64748b"
+                    style={{ fontSize: '12px', fontWeight: '500' }}
+                    tickLine={false}
+                    axisLine={{ stroke: '#e2e8f0' }}
+                    angle={chartTimeframe === '30days' ? -45 : 0}
+                    textAnchor={chartTimeframe === '30days' ? 'end' : 'middle'}
+                  />
+                  <YAxis 
+                    stroke="#64748b"
+                    style={{ fontSize: '12px', fontWeight: '500' }}
+                    tickLine={false}
+                    axisLine={{ stroke: '#e2e8f0' }}
+                    tickFormatter={(value) => formatNumber(value)}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar 
+                    dataKey="close" 
+                    shape={<Candlestick />}
+                    maxBarSize={30}
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.isPositive ? '#10b981' : '#ef4444'} />
+                    ))}
+                  </Bar>
+                </ComposedChart>
+              ) : (
+                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="#64748b"
+                    style={{ fontSize: '12px', fontWeight: '500' }}
+                    tickLine={false}
+                    axisLine={{ stroke: '#e2e8f0' }}
+                    angle={chartTimeframe === '30days' ? -45 : 0}
+                    textAnchor={chartTimeframe === '30days' ? 'end' : 'middle'}
+                    height={chartTimeframe === '30days' ? 80 : 30}
+                  />
+                  <YAxis 
+                    stroke="#64748b"
+                    style={{ fontSize: '12px', fontWeight: '500' }}
+                    tickLine={false}
+                    axisLine={{ stroke: '#e2e8f0' }}
+                    tickFormatter={(value) => formatNumber(value)}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area 
+                    type="monotone" 
+                    dataKey="total" 
+                    stroke="#10b981" 
+                    strokeWidth={3}
+                    fill="url(#colorTotal)"
+                    dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, strokeWidth: 2 }}
+                  />
+                </AreaChart>
+              )}
             </ResponsiveContainer>
           </div>
         )}
