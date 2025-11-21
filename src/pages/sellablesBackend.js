@@ -273,3 +273,57 @@ export const saveState = (entries, goal) => {
   localStorage.setItem('graalSellablesEntries', JSON.stringify(entries));
   localStorage.setItem('graalSellablesGoal', JSON.stringify(goal));
 };
+
+// Get user email from Claude environment
+export const getUserEmail = async () => {
+  try {
+    // In Claude.ai, we can access user info through the window object
+    // This is a placeholder - actual implementation depends on Claude's API
+    return localStorage.getItem('userEmail') || null;
+  } catch (error) {
+    console.error('Error getting user email:', error);
+    return null;
+  }
+};
+
+// Load data from cloud storage
+export const loadCloudData = async (email) => {
+  if (!email) return null;
+  
+  try {
+    const storageKey = `sellables_${email}`;
+    const result = await window.storage.get(storageKey, false);
+    
+    if (result && result.value) {
+      const data = JSON.parse(result.value);
+      return {
+        entries: data.entries || [],
+        goal: data.goal || { amount: 0, targetDate: '', active: false }
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error loading cloud data:', error);
+    return null;
+  }
+};
+
+// Save data to cloud storage
+export const saveCloudData = async (email, entries, goal) => {
+  if (!email) return;
+  
+  try {
+    const storageKey = `sellables_${email}`;
+    const data = {
+      entries,
+      goal,
+      lastModified: new Date().toISOString()
+    };
+    
+    await window.storage.set(storageKey, JSON.stringify(data), false);
+  } catch (error) {
+    console.error('Error saving cloud data:', error);
+    throw error;
+  }
+};

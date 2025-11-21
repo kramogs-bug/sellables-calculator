@@ -1,6 +1,5 @@
-// SellablesTracker.jsx
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Save, X, TrendingUp, TrendingDown, Target, Calendar, Clock, DollarSign, BarChart3, ChevronDown, History, AlertTriangle, Activity } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, TrendingUp, TrendingDown, Target, Calendar, Clock, DollarSign, BarChart3, ChevronDown, History, AlertTriangle, Activity, Cloud, CloudOff, RefreshCw } from 'lucide-react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import { sellablesIcons } from "../assets/assets.js";
 import {
@@ -19,7 +18,10 @@ import {
   setGoalHandler,
   clearGoal,
   initializeState,
-  saveState
+  saveState,
+  loadCloudData,
+  saveCloudData,
+  getUserEmail
 } from './sellablesBackend.js';
 
 const sellableItemsList = {
