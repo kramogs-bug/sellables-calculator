@@ -1,1185 +1,192 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Save, X, TrendingUp, TrendingDown, Target, Calendar, Clock, DollarSign, BarChart3, ChevronDown, History, AlertTriangle, Activity, Cloud, CloudOff, RefreshCw } from 'lucide-react';
-import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
-import { sellablesIcons } from "../assets/assets.js";
-import {
-  formatNumber,
-  formatCurrency,
-  handleNumberInputChange,
-  parseFormattedNumber,
-  evaluateExpression,
-  calculateStatistics,
-  groupEntriesByDate,
-  calculateGoalProgress,
-  createEntry,
-  updateEntry,
-  deleteEntry as deleteEntryUtil,
-  calculatePreviewTotal,
-  setGoalHandler,
-  clearGoal,
-  initializeState,
-  saveState,
-  loadCloudData,
-  saveCloudData,
-  getUserEmail
-} from './sellablesBackend.js';
+import { useEffect, useRef, useState } from 'react';
+import { Calendar, Edit2, Plus, Target, Trash2, X } from 'lucide-react';
+import { SELLABLE_BY_NAME, SELLABLE_CATEGORIES, SELLABLE_ITEMS } from './sellablesData.js';
+import { parseQuantity } from './calculatorBackend.js';
+import { calculateGoalProgress, calculateStatistics, formatNumber, groupEntriesByDate, loadTrackerState, parsePositiveNumber, saveTrackerState } from './sellablesBackend.js';
 
-const sellableItemsList = {
-  shells: [
-    { name: "Tro", price: 3, icon: sellablesIcons.tro },
-    { name: "Aero", price: 3, icon: sellablesIcons.aero },
-    { name: "Sand Dollar", price: 5, icon: sellablesIcons.sandDollar },
-    { name: "Scallop", price: 5, icon: sellablesIcons.scallop },
-    { name: "Starfish", price: 7, icon: sellablesIcons.star },
-  ],
-  mushrooms: [
-    { name: "Mushroom", price: 5, icon: sellablesIcons.mushrooms }
-  ],
-  trash: [
-    { name: "Bottle", price: 5, icon: sellablesIcons.bottle },
-    { name: "Paper", price: 4, icon: sellablesIcons.paper },
-    { name: "NewsPaper", price: 4, icon: sellablesIcons.news },
-    { name: "Tires", price: 6, icon: sellablesIcons.tires },
-  ],
-  crabshells: [
-    { name: "Crabshells", price: 6, icon: sellablesIcons.crabshell },
-  ],
-  minerals: [
-    { name: "Minerals", price: 5, icon: sellablesIcons.mineral },
-  ],
-  rareminerals: [
-    { name: "Gold", price: 10, icon: sellablesIcons.gold },
-    { name: "Diamond", price: 10, icon: sellablesIcons.diamond },
-    { name: "Emerald", price: 8, icon: sellablesIcons.emerald },
-    { name: "Ruby", price: 7, icon: sellablesIcons.ruby },
-    { name: "Sapphire", price: 7, icon: sellablesIcons.sapphire },
-  ],
-  flowers: [
-    { name: "Mum", price: 0.3, icon: sellablesIcons.mum },
-    { name: "Tulip", price: 0.4, icon: sellablesIcons.tulip },
-    { name: "Carnation", price: 0.5, icon: sellablesIcons.carnation },
-    { name: "Aster", price: 0.6, icon: sellablesIcons.aster },
-    { name: "Rose", price: 0.7, icon: sellablesIcons.rose },
-  ],
-};
+const EMPTY_GOAL = { amount: 0, targetDate: '', active: false };
+
+function createId() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function getLocalDateInputValue() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+}
 
 export default function SellablesTracker() {
-  // State initialization
-  const [state, setState] = useState(() => initializeState());
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [state, setState] = useState(loadTrackerState);
+  const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState('shells');
-  const [selectedItem, setSelectedItem] = useState(null);
+  const [itemName, setItemName] = useState(SELLABLE_ITEMS[0].name);
   const [quantity, setQuantity] = useState('');
   const [note, setNote] = useState('');
-  const [showGoalForm, setShowGoalForm] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [goalOpen, setGoalOpen] = useState(false);
   const [goalAmount, setGoalAmount] = useState('');
   const [targetDate, setTargetDate] = useState('');
-  const [expandedDates, setExpandedDates] = useState({});
-  const [showQuantityMessage, setShowQuantityMessage] = useState(true);
-  const [chartTimeframe, setChartTimeframe] = useState('7days'); // '7days', '30days', '12months'
-  const [chartType, setChartType] = useState('candlestick'); // 'candlestick', 'line'
-  const [averageTimeframe, setAverageTimeframe] = useState('7days'); // '7days', '30days', '12months'
-  const [deleteModal, setDeleteModal] = useState({
-    isOpen: false,
-    entryId: null,
-    entryName: '',
-    entryQuantity: 0,
-    entryTotal: 0
-  });
-
+  const [deletingEntry, setDeletingEntry] = useState(null);
+  const formRef = useRef(null);
   const { entries, goal } = state;
 
-  // Effects for saving state
-  useEffect(() => {
-    saveState(entries, goal);
-  }, [entries, goal]);
+  useEffect(() => { saveTrackerState(state); }, [state]);
 
-  // Helper functions
-  const getItemDetails = (itemName) => {
-    for (const category of Object.values(sellableItemsList)) {
-      const item = category.find(i => i.name === itemName);
-      if (item) return item;
-    }
-    return null;
+  const resetForm = () => {
+    setFormOpen(false);
+    setEditingId(null);
+    setItemName(SELLABLE_ITEMS[0].name);
+    setQuantity('');
+    setNote('');
+    setFormError('');
   };
 
-  // Event handlers
-  const addEntry = () => {
-    const newEntry = createEntry(selectedItem, quantity, note, getItemDetails);
-    if (newEntry) {
-      setState(prev => ({ ...prev, entries: [newEntry, ...prev.entries] }));
-      resetForm();
-    }
+  const openNewEntryForm = () => {
+    resetForm();
+    setFormOpen(true);
+    requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   };
 
-  const updateEntryHandler = () => {
-    const updatedEntries = updateEntry(entries, editingId, selectedItem, quantity, note, getItemDetails);
-    setState(prev => ({ ...prev, entries: updatedEntries }));
+  const submitEntry = (event) => {
+    event.preventDefault();
+    const parsedQuantity = parseQuantity(quantity);
+    const item = SELLABLE_BY_NAME.get(itemName);
+    if (!parsedQuantity || !item) {
+      setFormError('Enter a quantity greater than zero. You can also use an expression like 100+200.');
+      return;
+    }
+    const previousEntry = editingId ? entries.find((entry) => entry.id === editingId) : null;
+    const entry = {
+      id: editingId || createId(),
+      itemName,
+      quantity: parsedQuantity,
+      price: item.price,
+      total: parsedQuantity * item.price,
+      date: previousEntry?.date || new Date().toISOString(),
+      note: note.trim(),
+    };
+    setState((current) => ({
+      ...current,
+      entries: editingId
+        ? current.entries.map((value) => value.id === editingId ? entry : value)
+        : [entry, ...current.entries],
+    }));
     resetForm();
   };
 
-  const deleteEntry = (id) => {
-    setState(prev => ({ ...prev, entries: deleteEntryUtil(prev.entries, id) }));
-    closeDeleteModal();
-  };
-
-  const openDeleteModal = (entry) => {
-    setDeleteModal({
-      isOpen: true,
-      entryId: entry.id,
-      entryName: entry.itemName,
-      entryQuantity: entry.quantity,
-      entryTotal: entry.total
-    });
-  };
-
-  const closeDeleteModal = () => {
-    setDeleteModal({
-      isOpen: false,
-      entryId: null,
-      entryName: '',
-      entryQuantity: 0,
-      entryTotal: 0
-    });
-  };
-
-  const startEdit = (entry) => {
+  const editEntry = (entry) => {
     setEditingId(entry.id);
-    setSelectedItem(entry.itemName);
-    setQuantity(formatNumber(entry.quantity));
+    setItemName(entry.itemName);
+    setQuantity(String(entry.quantity));
     setNote(entry.note || '');
-    setShowAddForm(true);
-
-    for (const [category, items] of Object.entries(sellableItemsList)) {
-      if (items.find(item => item.name === entry.itemName)) {
-        setSelectedCategory(category);
-        break;
-      }
-    }
+    setFormError('');
+    setFormOpen(true);
+    requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   };
 
-  const resetForm = () => {
-    setShowAddForm(false);
-    setEditingId(null);
-    setSelectedItem(null);
-    setQuantity('');
-    setNote('');
-    setSelectedCategory('shells');
+  const confirmDelete = () => {
+    if (!deletingEntry) return;
+    setState((current) => ({ ...current, entries: current.entries.filter((entry) => entry.id !== deletingEntry.id) }));
+    setDeletingEntry(null);
   };
 
-  const handleSetGoal = () => {
-    const newGoal = setGoalHandler(goalAmount, targetDate);
-    if (newGoal) {
-      setState(prev => ({ ...prev, goal: newGoal }));
-      setShowGoalForm(false);
-      setGoalAmount('');
-      setTargetDate('');
-    }
+  const openGoalForm = () => {
+    setGoalAmount(goal.active ? String(goal.amount) : '');
+    setTargetDate(goal.active ? goal.targetDate : '');
+    setGoalOpen(true);
   };
 
-  const handleClearGoal = () => {
-    setState(prev => ({ ...prev, goal: clearGoal() }));
+  const submitGoal = (event) => {
+    event.preventDefault();
+    const amount = parsePositiveNumber(goalAmount);
+    if (!amount || !targetDate) return;
+    setState((current) => ({ ...current, goal: { amount, targetDate, active: true } }));
+    setGoalOpen(false);
   };
 
-  const toggleDateExpand = (date) => {
-    setExpandedDates(prev => ({
-      ...prev,
-      [date]: !prev[date]
-    }));
-  };
-
-  // Calculations
+  const parsedPreviewQuantity = parseQuantity(quantity) || 0;
+  const previewTotal = (SELLABLE_BY_NAME.get(itemName)?.price || 0) * parsedPreviewQuantity;
   const statistics = calculateStatistics(entries);
-  const dailyTotals = groupEntriesByDate(entries);
-  const goalProgress = calculateGoalProgress(goal, statistics.totalEarned);
-  const previewTotal = calculatePreviewTotal(selectedItem, quantity, getItemDetails);
-
-  // Calculate average based on selected timeframe
-  const calculateAverage = () => {
-    const now = new Date();
-    let filteredEntries = [];
-    let days = 0;
-
-    if (averageTimeframe === '7days') {
-      days = 7;
-      filteredEntries = entries.filter(entry => {
-        const entryDate = new Date(entry.date);
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        return entryDate >= weekAgo;
-      });
-    } else if (averageTimeframe === '30days') {
-      days = 30;
-      filteredEntries = entries.filter(entry => {
-        const entryDate = new Date(entry.date);
-        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        return entryDate >= monthAgo;
-      });
-    } else if (averageTimeframe === '12months') {
-      days = 365;
-      filteredEntries = entries.filter(entry => {
-        const entryDate = new Date(entry.date);
-        const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-        return entryDate >= yearAgo;
-      });
-    }
-
-    const total = filteredEntries.reduce((sum, entry) => sum + entry.total, 0);
-    return days > 0 ? (total / days).toFixed(2) : 0;
-  };
-
-  const avgValue = calculateAverage();
-
-  // Prepare candlestick chart data based on selected timeframe
-  const chartData = (() => {
-    const now = new Date();
-    
-    if (chartTimeframe === '7days') {
-      // Last 7 days
-      const last7Days = [];
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(now);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        
-        const dayEntries = entries.filter(entry => {
-          const entryDate = new Date(entry.date).toDateString();
-          return entryDate === date.toDateString();
-        });
-        
-        const total = dayEntries.reduce((sum, entry) => sum + entry.total, 0);
-        const prevDate = new Date(date);
-        prevDate.setDate(prevDate.getDate() - 1);
-        const prevDayEntries = entries.filter(entry => {
-          const entryDate = new Date(entry.date).toDateString();
-          return entryDate === prevDate.toDateString();
-        });
-        const prevTotal = prevDayEntries.reduce((sum, entry) => sum + entry.total, 0);
-        
-        last7Days.push({
-          date: dateStr,
-          total: total,
-          open: prevTotal || 0,
-          close: total,
-          high: Math.max(prevTotal || 0, total),
-          low: Math.min(prevTotal || 0, total),
-          isPositive: total >= (prevTotal || 0),
-          fullDate: date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-        });
-      }
-      return last7Days;
-    } else if (chartTimeframe === '30days') {
-      // Last 30 days
-      const last30Days = [];
-      for (let i = 29; i >= 0; i--) {
-        const date = new Date(now);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        
-        const dayEntries = entries.filter(entry => {
-          const entryDate = new Date(entry.date).toDateString();
-          return entryDate === date.toDateString();
-        });
-        
-        const total = dayEntries.reduce((sum, entry) => sum + entry.total, 0);
-        const prevDate = new Date(date);
-        prevDate.setDate(prevDate.getDate() - 1);
-        const prevDayEntries = entries.filter(entry => {
-          const entryDate = new Date(entry.date).toDateString();
-          return entryDate === prevDate.toDateString();
-        });
-        const prevTotal = prevDayEntries.reduce((sum, entry) => sum + entry.total, 0);
-        
-        last30Days.push({
-          date: dateStr,
-          total: total,
-          open: prevTotal || 0,
-          close: total,
-          high: Math.max(prevTotal || 0, total),
-          low: Math.min(prevTotal || 0, total),
-          isPositive: total >= (prevTotal || 0),
-          fullDate: date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-        });
-      }
-      return last30Days;
-    } else if (chartTimeframe === '12months') {
-      // Last 12 months
-      const last12Months = [];
-      for (let i = 11; i >= 0; i--) {
-        const date = new Date(now);
-        date.setMonth(date.getMonth() - i);
-        const monthStr = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-        
-        const monthEntries = entries.filter(entry => {
-          const entryDate = new Date(entry.date);
-          return entryDate.getMonth() === date.getMonth() && 
-                 entryDate.getFullYear() === date.getFullYear();
-        });
-        
-        const total = monthEntries.reduce((sum, entry) => sum + entry.total, 0);
-        const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-        const average = total / daysInMonth;
-        
-        const prevDate = new Date(date);
-        prevDate.setMonth(prevDate.getMonth() - 1);
-        const prevMonthEntries = entries.filter(entry => {
-          const entryDate = new Date(entry.date);
-          return entryDate.getMonth() === prevDate.getMonth() && 
-                 entryDate.getFullYear() === prevDate.getFullYear();
-        });
-        const prevTotal = prevMonthEntries.reduce((sum, entry) => sum + entry.total, 0);
-        
-        last12Months.push({
-          date: monthStr,
-          total: total,
-          open: prevTotal || 0,
-          close: total,
-          high: Math.max(prevTotal || 0, total),
-          low: Math.min(prevTotal || 0, total),
-          isPositive: total >= (prevTotal || 0),
-          average: average,
-          fullDate: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-        });
-      }
-      return last12Months;
-    }
-    
-    return [];
-  })();
-
-  // Custom Candlestick component
-  const Candlestick = (props) => {
-    const { x, y, width, height, payload } = props;
-    const isPositive = payload.isPositive;
-    const candleWidth = Math.min(width * 0.6, 20);
-    const centerX = x + width / 2;
-    
-    return (
-      <g>
-        {/* Wick (line) */}
-        <line
-          x1={centerX}
-          y1={y}
-          x2={centerX}
-          y2={y + height}
-          stroke={isPositive ? '#10b981' : '#ef4444'}
-          strokeWidth={1.5}
-        />
-        {/* Body (rectangle) */}
-        <rect
-          x={centerX - candleWidth / 2}
-          y={y + height * 0.2}
-          width={candleWidth}
-          height={height * 0.6}
-          fill={isPositive ? '#10b981' : '#ef4444'}
-          stroke={isPositive ? '#059669' : '#dc2626'}
-          strokeWidth={1}
-          rx={2}
-        />
-      </g>
-    );
-  };
-
-  // Custom tooltip for chart
-  const CustomTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white border-2 border-slate-200 rounded-xl shadow-xl p-4">
-          <p className="text-sm font-semibold text-slate-600 mb-2">{data.fullDate}</p>
-          <div className="space-y-1">
-            <div className="flex justify-between gap-4">
-              <span className="text-xs text-slate-500">Total:</span>
-              <span className="text-sm font-bold text-emerald-600">{formatNumber(data.close)} G</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-xs text-slate-500">Previous:</span>
-              <span className="text-sm font-semibold text-slate-700">{formatNumber(data.open)} G</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-xs text-slate-500">Change:</span>
-              <span className={`text-sm font-semibold ${data.isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                {data.isPositive ? '+' : ''}{formatNumber(data.close - data.open)} G
-              </span>
-            </div>
-          </div>
-          {chartTimeframe === '12months' && data.average && (
-            <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">
-              Daily Avg: {formatCurrency(data.average)} G
-            </p>
-          )}
-        </div>
-      );
-    }
-    return null;
-  };
+  const progress = calculateGoalProgress(goal, statistics.totalEarned);
+  const groups = groupEntriesByDate(entries);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
-      {/* Delete Confirmation Modal */}
-      {deleteModal.isOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full transform transition-all duration-300 scale-100">
-            <div className="p-6">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <AlertTriangle className="text-red-600" size={24} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-800">Delete Entry</h3>
-                  <p className="text-slate-600">Are you sure you want to delete this entry?</p>
-                </div>
-              </div>
-
-              <div className="bg-red-50 rounded-xl p-4 border border-red-200 mb-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-slate-800">{deleteModal.entryName}</p>
-                    <p className="text-sm text-slate-600">Quantity: {formatNumber(deleteModal.entryQuantity)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-red-600">{formatNumber(deleteModal.entryTotal)} G</p>
-                    <p className="text-xs text-slate-500">Total Value</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => deleteEntry(deleteModal.entryId)}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
-                >
-                  <Trash2 size={18} />
-                  Delete Entry
-                </button>
-                <button
-                  onClick={closeDeleteModal}
-                  className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-all duration-300"
-                >
-                  Cancel
-                </button>
-              </div>
+    <main className="min-h-[calc(100vh-4rem)] bg-[#E6F2DD] text-[#29453E]">
+      {deletingEntry ? (
+        <div className="fixed inset-0 z-[60] flex items-end bg-[#29453E]/50 p-3 sm:items-center sm:justify-center" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDeletingEntry(null); }}>
+          <section className="w-full rounded-2xl bg-white p-5 shadow-xl sm:max-w-sm sm:p-6" role="dialog" aria-modal="true" aria-labelledby="delete-title">
+            <div className="flex items-start justify-between gap-4">
+              <div><h2 id="delete-title" className="text-lg font-semibold">Delete entry?</h2><p className="mt-2 text-sm leading-6 text-[#527A70]">{deletingEntry.itemName} · {formatNumber(deletingEntry.quantity)} items · {formatNumber(deletingEntry.total)} G</p></div>
+              <button type="button" onClick={() => setDeletingEntry(null)} className="rounded-lg p-2 hover:bg-[#E6F2DD]" aria-label="Close delete confirmation"><X size={18} /></button>
             </div>
-          </div>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button type="button" onClick={() => setDeletingEntry(null)} className="rounded-lg border border-[#B1D3B9] px-4 py-3 text-sm font-semibold hover:bg-[#E6F2DD]">Cancel</button>
+              <button type="button" onClick={confirmDelete} className="rounded-lg bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700">Delete</button>
+            </div>
+          </section>
         </div>
-      )}
+      ) : null}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-lg shadow-blue-500/25 mb-4">
-            <img 
-              src={sellablesIcons.tracker_icon} 
-              alt="Tracker Icon" 
-              className="w-12 h-12" 
-            />
+      <section className="mx-auto max-w-7xl px-3 py-6 sm:px-6 sm:py-10 lg:px-8">
+        <header className="flex flex-col gap-4 border-b border-[#B1D3B9] pb-6 sm:gap-6 sm:pb-8 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wider text-[#659287]">Earnings tracker</p>
+            <h1 className="mt-2 text-2xl font-bold sm:text-4xl">Track your sellables</h1>
+            <p className="mt-2 text-sm leading-6 text-[#527A70] sm:mt-3 sm:text-base">Save sales, review daily totals, and monitor progress toward your goal.</p>
           </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent mb-3 flex items-center justify-center gap-3">
-            Sellables Tracker
-          </h1>
-          <p className="text-lg text-slate-600 font-medium max-w-2xl mx-auto">
-            Track your daily earnings, set goals, and maximize your profits
-          </p>
+          <button type="button" onClick={openNewEntryForm} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#659287] px-5 py-3 text-sm font-semibold text-white hover:bg-[#527A70]"><Plus size={17} /> Add entry</button>
+        </header>
+
+        {formOpen ? (
+          <form ref={formRef} onSubmit={submitEntry} className="scroll-mt-20 mt-5 rounded-xl border border-[#B1D3B9] bg-white p-4 sm:mt-6 sm:p-6">
+            <div className="flex items-center justify-between"><h2 className="text-lg font-semibold">{editingId ? 'Edit entry' : 'New entry'}</h2><button type="button" onClick={resetForm} aria-label="Close form" className="rounded-lg p-2 hover:bg-[#E6F2DD]"><X size={18} /></button></div>
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <label className="text-sm font-medium">Item<select value={itemName} onChange={(event) => setItemName(event.target.value)} className="mt-2 w-full rounded-lg border border-[#B1D3B9] bg-white px-3 py-3 outline-none focus:border-[#659287]">{SELLABLE_CATEGORIES.map((category) => <optgroup key={category.key} label={category.label}>{category.items.map((item) => <option key={item.name}>{item.name}</option>)}</optgroup>)}</select></label>
+              <label className="text-sm font-medium">Quantity or expression<input required type="text" inputMode="text" placeholder="Example: 100+200" value={quantity} onChange={(event) => { setQuantity(event.target.value.replace(/[^\d+\-*/().\s]/g, '')); setFormError(''); }} className="mt-2 w-full rounded-lg border border-[#B1D3B9] px-3 py-3 outline-none focus:border-[#659287]" /></label>
+              <label className="text-sm font-medium">Note <span className="font-normal text-[#659287]">(optional)</span><input value={note} maxLength={120} onChange={(event) => setNote(event.target.value)} className="mt-2 w-full rounded-lg border border-[#B1D3B9] px-3 py-3 outline-none focus:border-[#659287]" /></label>
+            </div>
+            {formError ? <p className="mt-3 text-sm font-medium text-red-700" role="alert">{formError}</p> : null}
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm text-[#527A70]">Live preview: <strong>{formatNumber(previewTotal)} G</strong></p><button type="submit" className="rounded-lg bg-[#659287] px-5 py-3 text-sm font-semibold text-white hover:bg-[#527A70]">{editingId ? 'Save changes' : 'Save entry'}</button></div>
+          </form>
+        ) : null}
+
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:gap-4 lg:grid-cols-4">
+          {[['Total earned', statistics.totalEarned], ['Today', statistics.todayTotal], ['Yesterday', statistics.yesterdayTotal], ['Entries', statistics.entryCount]].map(([label, value]) => <article key={label} className="rounded-xl border border-[#B1D3B9] bg-white p-4 sm:p-5"><p className="text-xs text-[#659287] sm:text-sm">{label}</p><p className="mt-2 truncate text-xl font-bold sm:text-2xl">{formatNumber(value)}{label !== 'Entries' ? ' G' : ''}</p></article>)}
         </div>
 
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Total Earned */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all duration-300">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-md">
-                <DollarSign className="text-white" size={24} />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Total Earned</p>
-                <p className="text-2xl font-bold text-slate-800">
-                  {formatNumber(statistics.totalEarned)}
-                </p>
-              </div>
-            </div>
-            <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
-              <p className="text-xs text-emerald-700 font-medium text-center">
-                All time earnings
-              </p>
-            </div>
+        <section className="mt-5 rounded-xl bg-[#659287] p-5 text-white sm:mt-6 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div><p className="text-sm text-[#E6F2DD]">Earnings goal</p><h2 className="mt-1 text-lg font-semibold sm:text-xl">{goal.active ? `${formatNumber(progress.percentage)}% complete` : 'Set a target to track progress'}</h2></div>
+            <div className="grid grid-cols-2 gap-2 sm:flex"><button type="button" onClick={openGoalForm} className="rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-[#527A70]"><Target size={16} className="mr-2 inline" />{goal.active ? 'Update' : 'Set goal'}</button>{goal.active ? <button type="button" onClick={() => { setState((current) => ({ ...current, goal: EMPTY_GOAL })); setGoalOpen(false); }} className="rounded-lg bg-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-white/20">Clear</button> : null}</div>
           </div>
+          {goal.active ? <><div className="mt-5 h-2 overflow-hidden rounded-full bg-white/20"><div className="h-full rounded-full bg-[#E6F2DD]" style={{ width: `${progress.percentage}%` }} /></div><p className="mt-3 text-sm text-[#E6F2DD]">{formatNumber(progress.remaining)} G remaining · {progress.daysRemaining} days left</p></> : null}
+          {goalOpen ? <form onSubmit={submitGoal} className="mt-5 grid gap-3 rounded-lg bg-white/10 p-3 sm:grid-cols-[1fr_1fr_auto] sm:p-4"><label className="text-xs text-[#E6F2DD]">Goal amount<input required type="number" min="1" step="any" value={goalAmount} onChange={(event) => setGoalAmount(event.target.value)} className="mt-1.5 w-full rounded-lg border border-white/30 bg-white px-3 py-2.5 text-[#29453E]" /></label><label className="text-xs text-[#E6F2DD]">Target date<input required type="date" min={getLocalDateInputValue()} value={targetDate} onChange={(event) => setTargetDate(event.target.value)} className="mt-1.5 w-full rounded-lg border border-white/30 bg-white px-3 py-2.5 text-[#29453E]" /></label><button className="rounded-lg bg-[#29453E] px-4 py-2.5 text-sm font-semibold sm:self-end">Save goal</button></form> : null}
+        </section>
 
-          {/* Today's Earnings */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all duration-300">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
-                <Calendar className="text-white" size={24} />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Today's Total</p>
-                <p className="text-2xl font-bold text-slate-800">
-                  {formatNumber(statistics.todayTotal)}
-                </p>
-              </div>
-            </div>
-            <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
-              <div className="flex items-center justify-center gap-2">
-                {statistics.dailyChange !== 0 && (
-                  <>
-                    {statistics.dailyChange > 0 ? (
-                      <TrendingUp className="text-green-600" size={16} />
-                    ) : (
-                      <TrendingDown className="text-red-600" size={16} />
-                    )}
-                    <p className="text-xs font-medium text-blue-700">
-                      {statistics.dailyChange > 0 ? '+' : ''}{formatNumber(statistics.dailyChange)} ({statistics.dailyChangePercent}%) vs yesterday
-                    </p>
-                  </>
-                )}
-                {statistics.dailyChange === 0 && (
-                  <p className="text-xs font-medium text-blue-700">Same as yesterday</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Average Daily */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all duration-300">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-md">
-                <TrendingUp className="text-white" size={24} />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
-                  {averageTimeframe === '7days' && '7-Day Average'}
-                  {averageTimeframe === '30days' && '30-Day Average'}
-                  {averageTimeframe === '12months' && 'Yearly Average'}
-                </p>
-                <p className="text-2xl font-bold text-slate-800">
-                  {formatCurrency(avgValue)}
-                </p>
-              </div>
-            </div>
-            <div className="bg-purple-50 rounded-lg p-3 border border-purple-100">
-              <div className="flex gap-2 justify-center flex-wrap">
-                <button
-                  onClick={() => setAverageTimeframe('7days')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-300 ${
-                    averageTimeframe === '7days'
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-white text-purple-600 hover:bg-purple-100'
-                  }`}
-                >
-                  7D
-                </button>
-                <button
-                  onClick={() => setAverageTimeframe('30days')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-300 ${
-                    averageTimeframe === '30days'
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-white text-purple-600 hover:bg-purple-100'
-                  }`}
-                >
-                  30D
-                </button>
-                <button
-                  onClick={() => setAverageTimeframe('12months')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-300 ${
-                    averageTimeframe === '12months'
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-white text-purple-600 hover:bg-purple-100'
-                  }`}
-                >
-                  1Y
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Candlestick/Line Chart */}
-        {entries.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
-                  <Activity className="text-white" size={24} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-800">Earnings Trend</h2>
-                  <p className="text-sm text-slate-500">
-                    {chartTimeframe === '7days' && 'Last 7 days performance'}
-                    {chartTimeframe === '30days' && 'Last 30 days performance'}
-                    {chartTimeframe === '12months' && 'Last 12 months performance'}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                {/* Chart Type Toggle */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setChartType('candlestick')}
-                    className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
-                      chartType === 'candlestick'
-                        ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    Candlestick
-                  </button>
-                  <button
-                    onClick={() => setChartType('line')}
-                    className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
-                      chartType === 'line'
-                        ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    Line
-                  </button>
-                </div>
-                
-                {/* Timeframe Toggle */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setChartTimeframe('7days')}
-                    className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
-                      chartTimeframe === '7days'
-                        ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    7 Days
-                  </button>
-                  <button
-                    onClick={() => setChartTimeframe('30days')}
-                    className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
-                      chartTimeframe === '30days'
-                        ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    30 Days
-                  </button>
-                  <button
-                    onClick={() => setChartTimeframe('12months')}
-                    className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
-                      chartTimeframe === '12months'
-                        ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    12 Months
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <ResponsiveContainer width="100%" height={350}>
-              {chartType === 'candlestick' ? (
-                <ComposedChart data={chartData} margin={{ top: 20, right: 10, left: 0, bottom: chartTimeframe === '30days' ? 50 : 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="#64748b"
-                    style={{ fontSize: '12px', fontWeight: '500' }}
-                    tickLine={false}
-                    axisLine={{ stroke: '#e2e8f0' }}
-                    angle={chartTimeframe === '30days' ? -45 : 0}
-                    textAnchor={chartTimeframe === '30days' ? 'end' : 'middle'}
-                  />
-                  <YAxis 
-                    stroke="#64748b"
-                    style={{ fontSize: '12px', fontWeight: '500' }}
-                    tickLine={false}
-                    axisLine={{ stroke: '#e2e8f0' }}
-                    tickFormatter={(value) => formatNumber(value)}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar 
-                    dataKey="close" 
-                    shape={<Candlestick />}
-                    maxBarSize={30}
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.isPositive ? '#10b981' : '#ef4444'} />
-                    ))}
-                  </Bar>
-                </ComposedChart>
-              ) : (
-                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="#64748b"
-                    style={{ fontSize: '12px', fontWeight: '500' }}
-                    tickLine={false}
-                    axisLine={{ stroke: '#e2e8f0' }}
-                    angle={chartTimeframe === '30days' ? -45 : 0}
-                    textAnchor={chartTimeframe === '30days' ? 'end' : 'middle'}
-                    height={chartTimeframe === '30days' ? 80 : 30}
-                  />
-                  <YAxis 
-                    stroke="#64748b"
-                    style={{ fontSize: '12px', fontWeight: '500' }}
-                    tickLine={false}
-                    axisLine={{ stroke: '#e2e8f0' }}
-                    tickFormatter={(value) => formatNumber(value)}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Area 
-                    type="monotone" 
-                    dataKey="total" 
-                    stroke="#10b981" 
-                    strokeWidth={3}
-                    fill="url(#colorTotal)"
-                    dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, strokeWidth: 2 }}
-                  />
-                </AreaChart>
-              )}
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* Goal Tracker */}
-        {goal.active ? (
-          <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 rounded-2xl border border-amber-200 p-6 mb-8">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <Target className="text-white" size={28} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-800 mb-1">Goal Progress</h2>
-                  <p className="text-sm text-slate-600">Target: {formatNumber(goal.amount)} Gralats by {new Date(goal.targetDate).toLocaleDateString()}</p>
-                </div>
-              </div>
-              <button
-                onClick={handleClearGoal}
-                className="px-4 py-2 bg-white hover:bg-red-50 text-red-600 font-semibold rounded-xl transition-all duration-300 flex items-center gap-2 border border-red-200 hover:border-red-300"
-              >
-                <X size={16} />
-                Clear Goal
-              </button>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-slate-700">Progress</span>
-                <span className="text-sm font-bold text-slate-800">{formatNumber(goalProgress.goalProgress)}%</span>
-              </div>
-              <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-emerald-500 to-green-500 rounded-full transition-all duration-1000 ease-out shadow-md"
-                  style={{ width: `${goalProgress.goalProgress}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Goal Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-amber-100">
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="text-amber-600" size={18} />
-                  <p className="text-xs font-semibold text-amber-700 uppercase">Days Left</p>
-                </div>
-                <p className="text-2xl font-bold text-slate-800">{formatNumber(goalProgress.daysRemaining)}</p>
-              </div>
-
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-blue-100">
-                <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="text-blue-600" size={18} />
-                  <p className="text-xs font-semibold text-blue-700 uppercase">Per Day</p>
-                </div>
-                <p className="text-2xl font-bold text-slate-800">{formatCurrency(goalProgress.neededPerDay)}</p>
-              </div>
-
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-purple-100">
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="text-purple-600" size={18} />
-                  <p className="text-xs font-semibold text-purple-700 uppercase">Per Hour</p>
-                </div>
-                <p className="text-2xl font-bold text-slate-800">{formatCurrency(goalProgress.neededPerHour)}</p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          !showGoalForm && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 mb-8 text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Target className="text-amber-600" size={32} />
-              </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">Set a Goal</h3>
-              <p className="text-slate-600 mb-6">Track your progress and stay motivated</p>
-              <button
-                onClick={() => setShowGoalForm(true)}
-                className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
-              >
-                Set Goal
-              </button>
-            </div>
-          )
-        )}
-
-        {/* Goal Form */}
-        {showGoalForm && !goal.active && (
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-slate-800">Set Your Goal</h2>
-              <button
-                onClick={() => setShowGoalForm(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Goal Amount (Gralats)
-                </label>
-                <input
-                  type="text"
-                  value={goalAmount}
-                  onChange={(e) => handleNumberInputChange(e.target.value, setGoalAmount)}
-                  placeholder="e.g., 10,000"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-slate-900 font-semibold transition-all"
-                />
-                <p className="text-xs text-slate-500 mt-1">Enter amount without commas - they will be added automatically</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Target Date
-                </label>
-                <input
-                  type="date"
-                  value={targetDate}
-                  onChange={(e) => setTargetDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-slate-900 font-semibold transition-all"
-                />
-              </div>
-
-              <button
-                onClick={handleSetGoal}
-                disabled={!goalAmount || !targetDate}
-                className="w-full px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Set Goal
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Add Entry Button */}
-        {!showAddForm && (
-          <div className="mb-8">
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 transform hover:scale-105"
-            >
-              <Plus size={24} />
-              Add New Entry
-            </button>
-          </div>
-        )}
-
-        {/* Add/Edit Form */}
-        {showAddForm && (
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-slate-800">
-                {editingId ? 'Edit Entry' : 'Add New Entry'}
-              </h2>
-              <button
-                onClick={resetForm}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              {/* Category Selection */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-3">
-                  Category
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {Object.entries({
-                    shells: "Shells",
-                    mushrooms: "Mushrooms",
-                    trash: "Trash", 
-                    crabshells: "Crabshells",
-                    minerals: "Minerals",
-                    rareminerals: "Rare Minerals",
-                    flowers: "Flowers"
-                  }).map(([key, name]) => (
-                    <button
-                      key={key}
-                      onClick={() => {
-                        setSelectedCategory(key);
-                        setSelectedItem(null);
-                      }}
-                      className={`p-4 rounded-xl border-2 transition-all duration-300 font-semibold ${
-                        selectedCategory === key
-                          ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md scale-105'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:shadow-sm'
-                      }`}
-                    >
-                      {name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Item Selection */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-3">
-                  Item
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                  {sellableItemsList[selectedCategory]?.map((item) => (
-                    <button
-                      key={item.name}
-                      onClick={() => setSelectedItem(item.name)}
-                      className={`p-4 rounded-xl border-2 transition-all duration-300 hover:shadow-md ${
-                        selectedItem === item.name
-                          ? 'border-green-500 bg-green-50 shadow-md scale-105'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="w-12 h-12 flex items-center justify-center bg-slate-50 rounded-lg">
-                          <img 
-                            src={item.icon} 
-                            alt={item.name}
-                            className="w-10 h-10 object-contain"
-                          />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm font-semibold text-slate-800">{item.name}</p>
-                          <p className="text-xs text-emerald-600 font-medium">{formatNumber(item.price)} G</p>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Quantity and Note */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Quantity
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={quantity}
-                      onChange={(e) => handleNumberInputChange(e.target.value, setQuantity)}
-                      onFocus={() => setShowQuantityMessage(false)}
-                      onBlur={() => setShowQuantityMessage(true)}
-                      placeholder="Enter quantity or expression like 200+400"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 font-semibold transition-all"
-                    />
-                    {/* Show evaluated result for expressions */}
-                    {quantity && /[+\-*/().]/.test(quantity.replace(/,/g, '')) && (
-                      <div className="absolute -bottom-6 left-0 right-0">
-                        <p className="text-xs text-green-600 font-medium text-center">
-                          = {formatNumber(evaluateExpression(parseFormattedNumber(quantity)))} items
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  {showQuantityMessage && (
-                    <p className="text-xs text-red-500 mt-1">
-                      You can input expressions like 200+400 for items with the same price
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Note (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="Add a note..."
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* Preview */}
-              {selectedItem && quantity && (
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                  <p className="text-sm font-semibold text-slate-700 mb-2">Preview:</p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 flex items-center justify-center bg-white rounded-lg border border-slate-200">
-                        <img 
-                          src={getItemDetails(selectedItem)?.icon} 
-                          alt={selectedItem}
-                          className="w-8 h-8 object-contain"
-                        />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-slate-800">{selectedItem}</p>
-                        <p className="text-sm text-slate-500">
-                          × {formatNumber(evaluateExpression(parseFormattedNumber(quantity)))} 
-                          {/[+\-*/().]/.test(quantity.replace(/,/g, '')) && (
-                            <span className="text-xs text-green-600 ml-1">
-                              (from {quantity})
-                            </span>
-                          )}
-                        </p>
-                      </div>
+        <section className="mt-7 sm:mt-8" aria-labelledby="history-heading">
+          <div className="flex items-center gap-2"><Calendar size={19} className="text-[#659287]" /><h2 id="history-heading" className="text-xl font-semibold">History</h2></div>
+          <div className="mt-4 space-y-4">
+            {groups.map((group) => (
+              <article key={group.date} className="overflow-hidden rounded-xl border border-[#B1D3B9] bg-white">
+                <div className="flex justify-between gap-3 bg-[#F2F8ED] px-4 py-3 sm:px-5"><span className="truncate text-sm font-semibold">{group.date}</span><span className="shrink-0 text-sm font-semibold text-[#527A70]">{formatNumber(group.total)} G</span></div>
+                {group.entries.map((entry) => {
+                  const item = SELLABLE_BY_NAME.get(entry.itemName);
+                  return (
+                    <div key={entry.id} className="grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 border-t border-[#E6F2DD] p-3 sm:grid-cols-[2.25rem_minmax(0,1fr)_auto_auto] sm:p-4">
+                      {item?.icon ? <img src={item.icon} alt="" className="size-9 object-contain" /> : <span className="size-9 rounded-lg bg-[#E6F2DD]" />}
+                      <div className="min-w-0"><p className="truncate text-sm font-semibold">{entry.itemName} · {formatNumber(entry.quantity)}</p>{entry.note ? <p className="truncate text-xs text-[#659287]">{entry.note}</p> : <p className="text-xs text-[#88BDA4]">{formatNumber(entry.price)} G each</p>}</div>
+                      <strong className="whitespace-nowrap text-sm">{formatNumber(entry.total)} G</strong>
+                      <div className="col-span-3 grid grid-cols-2 gap-2 sm:col-span-1 sm:flex"><button type="button" onClick={() => editEntry(entry)} className="inline-flex items-center justify-center gap-2 rounded-md bg-[#E6F2DD] px-3 py-2 text-xs font-semibold text-[#527A70]" aria-label={`Edit ${entry.itemName}`}><Edit2 size={14} /> Edit</button><button type="button" onClick={() => setDeletingEntry(entry)} className="inline-flex items-center justify-center gap-2 rounded-md bg-red-50 px-3 py-2 text-xs font-semibold text-red-700" aria-label={`Delete ${entry.itemName}`}><Trash2 size={14} /> Delete</button></div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-emerald-600">
-                        {formatNumber(previewTotal)} G
-                      </p>
-                      <p className="text-xs text-slate-500">Total</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={editingId ? updateEntryHandler : addEntry}
-                  disabled={!selectedItem || !quantity}
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  <Save size={20} />
-                  {editingId ? 'Update Entry' : 'Add Entry'}
-                </button>
-                <button
-                  onClick={resetForm}
-                  className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-all duration-300"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+                  );
+                })}
+              </article>
+            ))}
+            {entries.length === 0 ? <div className="rounded-xl border border-dashed border-[#88BDA4] bg-white/40 p-8 text-center text-sm text-[#527A70] sm:p-10">No entries yet. Add your first sellable above.</div> : null}
           </div>
-        )}
-
-        {/* Entries List */}
-        <div className="space-y-4">
-          {dailyTotals.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
-              <History className="text-slate-300 mx-auto mb-4" size={48} />
-              <h3 className="text-xl font-semibold text-slate-400 mb-2">No entries yet</h3>
-              <p className="text-slate-400">Start tracking your sellables to see your progress!</p>
-            </div>
-          ) : (
-            dailyTotals.map(({ date, total, entries: dayEntries }) => (
-              <div key={date} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <button
-                  onClick={() => toggleDateExpand(date)}
-                  className="w-full px-6 py-5 flex items-center justify-between hover:bg-slate-50 transition-all duration-300"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-md">
-                      <Calendar className="text-white" size={20} />
-                    </div>
-                    <div className="text-left">
-                      <h3 className="text-lg font-semibold text-slate-800">{date}</h3>
-                      <p className="text-sm text-slate-500">{formatNumber(dayEntries.length)} {dayEntries.length === 1 ? 'entry' : 'entries'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-sm text-slate-500 font-medium">Daily Total</p>
-                      <p className="text-xl font-bold text-slate-800">
-                        {formatNumber(total)} G
-                      </p>
-                    </div>
-                    <ChevronDown 
-                      className={`text-slate-400 transition-transform duration-300 ${
-                        expandedDates[date] ? 'rotate-180' : ''
-                      }`}
-                      size={20}
-                    />
-                  </div>
-                </button>
-
-                {expandedDates[date] && (
-                  <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/50">
-                    <div className="space-y-3">
-                      {dayEntries.map((entry) => (
-                        <div
-                          key={entry.id}
-                          className="bg-white rounded-xl p-4 border border-slate-200 hover:border-slate-300 transition-all duration-300 hover:shadow-sm"
-                        >
-                          <div className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-4 flex-1 min-w-0">
-                              <div className="w-12 h-12 flex items-center justify-center bg-slate-50 rounded-lg border border-slate-200 flex-shrink-0">
-                                <img 
-                                  src={entry.icon} 
-                                  alt={entry.itemName}
-                                  className="w-8 h-8 object-contain"
-                                />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="font-semibold text-slate-800 truncate">{entry.itemName}</h4>
-                                  <span className="text-sm text-slate-500">×{formatNumber(entry.quantity)}</span>
-                                </div>
-                                {entry.note && (
-                                  <p className="text-xs text-slate-500 italic truncate">{entry.note}</p>
-                                )}
-                                <p className="text-xs text-slate-400">
-                                  {new Date(entry.date).toLocaleTimeString('en-US', { 
-                                    hour: '2-digit', 
-                                    minute: '2-digit'
-                                  })}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <div className="text-right">
-                                <p className="text-lg font-bold text-emerald-600">
-                                  {formatNumber(entry.total)} G
-                                </p>
-                              </div>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => startEdit(entry)}
-                                  className="w-10 h-10 bg-blue-100 hover:bg-blue-500 hover:text-white text-blue-600 rounded-xl transition-all duration-300 flex items-center justify-center"
-                                >
-                                  <Edit2 size={16} />
-                                </button>
-                                <button
-                                  onClick={() => openDeleteModal(entry)}
-                                  className="w-10 h-10 bg-red-100 hover:bg-red-500 hover:text-white text-red-600 rounded-xl transition-all duration-300 flex items-center justify-center"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
+        </section>
+      </section>
+    </main>
   );
 }

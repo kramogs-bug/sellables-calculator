@@ -1,16 +1,29 @@
-# React + Vite
+# Graal Sellables Calculator
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React and Vite frontend with a sellables calculator, earnings tracker, and a free local Graal body and head preview generator.
 
-Currently, two official plugins are available:
+## Local development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```powershell
+npm install
+npm run dev
+```
 
-## React Compiler
+The Body Upload Generator runs entirely in the browser. It can combine a body sheet with an optional head sheet and does not require an API key, environment variable, account, or server-side image service.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Images can be selected from a file or pasted directly from the clipboard. Clipboard images are detected automatically as a body or head sheet from their dimensions.
 
-## Expanding the ESLint configuration
+For the most accurate preview, upload a standard `128 x 720` Graal body PNG and an optional standard `32 x 560` Graal head PNG. The normal up, left, down, and right frames from the first standing row are assembled into a single `32 x 48` character, with the body positioned 16 pixels below the head.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Solid white or colored sprite-sheet backgrounds are removed locally from frame edges before compositing. This can be disabled in the preview controls, and the original uploaded files are not modified.
+
+The default character display is an interactive 360-degree sprite turntable. Drag, swipe, use the keyboard arrows, or enable automatic rotation to move through the front, right, back, and left frames. A four-view comparison mode remains available.
+
+Before an upload, bundled sample character images keep both preview modes populated. Uploaded files are accepted only when they match the standard Graal body or head dimensions and have sprite-sheet-like repeated transparent or solid frame backgrounds; ordinary photos and screenshots are rejected.
+
+## Checks
+
+```powershell
+npm run lint
+npm run build
+```

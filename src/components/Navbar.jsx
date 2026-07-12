@@ -1,253 +1,83 @@
+import { createElement, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Home, Info, BarChart3, Code } from 'lucide-react';
-import { useState } from 'react';
-import { sellablesIcons } from '../assets/assets.js';
+import { BarChart3, Calculator, Home, Info, Layers3, Menu, X } from 'lucide-react';
+
+const navItems = [
+  { to: '/', label: 'Home', icon: Home },
+  { to: '/calculator', label: 'Calculator', icon: Calculator },
+  { to: '/tracker', label: 'Tracker', icon: BarChart3 },
+  { to: '/body-generator', label: 'Body Upload Generator', icon: Layers3 },
+  { to: '/about', label: 'About', icon: Info },
+];
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const location = useLocation();
-
-  const isActive = (path) => location.pathname === path;
+  const { pathname } = useLocation();
 
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-50 border-b border-slate-200 animate-slideDown">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-20">
-          {/* Logo/Brand */}
-          <div className="flex items-center animate-fadeIn">
-            <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-16 h-16 bg-white rounded-2xl shadow-lg border border-slate-200 flex items-center justify-center group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 group-hover:rotate-3">
-                <img 
-                  src={sellablesIcons.calculator} 
-                  alt="Calculator Icon"
-                  className="w-30 h-15 transition-transform duration-300 group-hover:scale-110"
-                  onError={(e) => {
-                    console.warn('Calculator icon not found, using star icon as fallback');
-                    e.target.src = sellablesIcons.star;
-                    e.target.className = "w-10 h-10 transition-transform duration-300 group-hover:scale-110";
-                  }}
-                />
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="text-xl font-bold text-slate-800 group-hover:text-blue-600 transition-all duration-300">
-                  Graal Calculator
-                </h1>
-                <p className="text-xs text-slate-500 font-medium transition-all duration-300 group-hover:text-blue-500">by kramogss</p>
-              </div>
-            </Link>
-          </div>
+    <nav className="sticky top-0 z-50 border-b border-[#B1D3B9] bg-white" aria-label="Main navigation">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <Link to="/" className="flex items-center gap-3" onClick={() => setIsOpen(false)}>
+          <span className="flex size-9 items-center justify-center rounded-lg bg-[#659287] text-white">
+            <Calculator size={19} aria-hidden="true" />
+          </span>
+          <span>
+            <span className="block text-sm font-semibold text-[#29453E]">Graal Calculator</span>
+            <span className="block text-xs text-[#659287]">by kramogss</span>
+          </span>
+        </Link>
 
-          {/* Desktop Menu */}
-          <div className="hidden md:flex items-center space-x-2 animate-fadeIn">
-            <Link 
-              to="/" 
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 font-semibold transform hover:scale-105 ${
-                isActive('/') 
-                  ? 'bg-blue-500 text-white shadow-lg scale-105' 
-                  : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600 hover:shadow-md'
-              }`}
-            >
-              <Home size={20} className="transition-transform duration-300 group-hover:rotate-12" />
-              <span>Home</span>
-            </Link>
-            <Link 
-              to="/calculator" 
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 font-semibold transform hover:scale-105 ${
-                isActive('/calculator') 
-                  ? 'bg-blue-500 text-white shadow-lg scale-105' 
-                  : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600 hover:shadow-md'
-              }`}
-            >
-              <div className="w-5 h-5 flex items-center justify-center">
-                <img 
-                  src={sellablesIcons.calculator} 
-                  alt="Calculator"
-                  className="w-4 h-4 transition-transform duration-300 group-hover:rotate-12"
-                  onError={(e) => {
-                    console.warn('Calculator icon not found for menu');
-                    e.target.style.display = 'none';
-                  }}
-                />
-              </div>
-              <span>Calculator</span>
-            </Link>
-            <Link 
-              to="/tracker" 
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 font-semibold transform hover:scale-105 ${
-                isActive('/tracker') 
-                  ? 'bg-blue-500 text-white shadow-lg scale-105' 
-                  : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600 hover:shadow-md'
-              }`}
-            >
-              <BarChart3 size={20} className="transition-transform duration-300 group-hover:rotate-12" />
-              <span>Tracker</span>
-            </Link>
-            <Link 
-              to="/codes" 
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 font-semibold transform hover:scale-105 ${
-                isActive('/codes') 
-                  ? 'bg-blue-500 text-white shadow-lg scale-105' 
-                  : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600 hover:shadow-md'
-              }`}
-            >
-              <Code size={20} className="transition-transform duration-300 group-hover:rotate-12" />
-              <span>Codes</span>
-            </Link>
-            <Link 
-              to="/about" 
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 font-semibold transform hover:scale-105 ${
-                isActive('/about') 
-                  ? 'bg-blue-500 text-white shadow-lg scale-105' 
-                  : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600 hover:shadow-md'
-              }`}
-            >
-              <Info size={20} className="transition-transform duration-300 group-hover:rotate-12" />
-              <span>About</span>
-            </Link>
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="md:hidden flex items-center animate-fadeIn">
-            <button 
-              onClick={() => setIsOpen(!isOpen)} 
-              className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-all duration-300 transform hover:scale-110"
-              aria-label="Toggle menu"
-            >
-              <div className="relative w-6 h-6">
-                <X 
-                  size={24} 
-                  className={`absolute inset-0 transition-all duration-300 ${
-                    isOpen ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 rotate-90 scale-0'
-                  }`}
-                />
-                <Menu 
-                  size={24} 
-                  className={`absolute inset-0 transition-all duration-300 ${
-                    isOpen ? 'opacity-0 -rotate-90 scale-0' : 'opacity-100 rotate-0 scale-100'
-                  }`}
-                />
-              </div>
-            </button>
-          </div>
+        <div className="hidden items-center gap-1 md:flex">
+          {navItems.map(({ to, label, icon }) => {
+            const active = pathname === to;
+            return (
+              <Link
+                key={to}
+                to={to}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  active ? 'bg-[#659287] text-white' : 'text-[#527A70] hover:bg-[#E6F2DD] hover:text-[#29453E]'
+                }`}
+                aria-current={active ? 'page' : undefined}
+              >
+                {createElement(icon, { size: 17, 'aria-hidden': true })}
+                {label}
+              </Link>
+            );
+          })}
         </div>
+
+        <button
+          type="button"
+          className="flex size-10 items-center justify-center rounded-lg text-[#527A70] hover:bg-[#E6F2DD] md:hidden"
+          onClick={() => setIsOpen((open) => !open)}
+          aria-label={isOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={isOpen}
+        >
+          {isOpen ? <X size={21} /> : <Menu size={21} />}
+        </button>
       </div>
 
-      {/* Mobile Menu */}
-      <div 
-        className={`md:hidden bg-white border-t border-slate-200 shadow-lg overflow-hidden transition-all duration-500 ease-in-out ${
-          isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-        }`}
-      >
-        <div className="px-4 py-4 space-y-2">
-          <Link 
-            to="/" 
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 font-semibold transform hover:scale-105 hover:translate-x-2 ${
-              isActive('/') 
-                ? 'bg-blue-500 text-white shadow-lg scale-105' 
-                : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600'
-            }`}
-            onClick={() => setIsOpen(false)}
-          >
-            <Home size={20} />
-            <span>Home</span>
-          </Link>
-          <Link 
-            to="/calculator" 
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 font-semibold transform hover:scale-105 hover:translate-x-2 ${
-              isActive('/calculator') 
-                ? 'bg-blue-500 text-white shadow-lg scale-105' 
-                : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600'
-            }`}
-            onClick={() => setIsOpen(false)}
-          >
-            <div className="w-5 h-5 flex items-center justify-center">
-              <img 
-                src={sellablesIcons.calculator} 
-                alt="Calculator"
-                className="w-4 h-4"
-                onError={(e) => {
-                  console.warn('Calculator icon not found for mobile menu');
-                  e.target.style.display = 'none';
-                }}
-              />
-            </div>
-            <span>Calculator</span>
-          </Link>
-          <Link 
-            to="/tracker" 
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 font-semibold transform hover:scale-105 hover:translate-x-2 ${
-              isActive('/tracker') 
-                ? 'bg-blue-500 text-white shadow-lg scale-105' 
-                : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600'
-            }`}
-            onClick={() => setIsOpen(false)}
-          >
-            <BarChart3 size={20} />
-            <span>Tracker</span>
-          </Link>
-          <Link 
-            to="/codes" 
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 font-semibold transform hover:scale-105 hover:translate-x-2 ${
-              isActive('/codes') 
-                ? 'bg-blue-500 text-white shadow-lg scale-105' 
-                : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600'
-            }`}
-            onClick={() => setIsOpen(false)}
-          >
-            <Code size={20} />
-            <span>Codes</span>
-          </Link>
-          <Link 
-            to="/about" 
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 font-semibold transform hover:scale-105 hover:translate-x-2 ${
-              isActive('/about') 
-                ? 'bg-blue-500 text-white shadow-lg scale-105' 
-                : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600'
-            }`}
-            onClick={() => setIsOpen(false)}
-          >
-            <Info size={20} />
-            <span>About</span>
-          </Link>
+      {isOpen ? (
+        <div className="border-t border-[#B1D3B9] bg-white px-4 py-3 md:hidden">
+          {navItems.map(({ to, label, icon }) => {
+            const active = pathname === to;
+            return (
+              <Link
+                key={to}
+                to={to}
+                onClick={() => setIsOpen(false)}
+                className={`mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
+                  active ? 'bg-[#659287] text-white' : 'text-[#527A70] hover:bg-[#E6F2DD]'
+                }`}
+                aria-current={active ? 'page' : undefined}
+              >
+                {createElement(icon, { size: 18, 'aria-hidden': true })}
+                {label}
+              </Link>
+            );
+          })}
         </div>
-        
-        {/* Mobile Footer */}
-        <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 animate-fadeIn">
-          <p className="text-xs text-center text-slate-500 font-medium">
-            Made with <span className="text-red-500 animate-pulse inline-block">❤️</span> by kramogs
-          </p>
-        </div>
-      </div>
-
-      <style jsx>{`
-        @keyframes slideDown {
-          from {
-            transform: translateY(-100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-
-        .animate-slideDown {
-          animation: slideDown 0.5s ease-out;
-        }
-
-        .animate-fadeIn {
-          animation: fadeIn 0.8s ease-out;
-        }
-      `}</style>
+      ) : null}
     </nav>
   );
 }

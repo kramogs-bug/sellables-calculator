@@ -4,8 +4,8 @@ import Home from './pages/Home';
 import Calculator from './pages/Calculator';
 import SellablesTracker from './pages/SellablesTracker';
 import About from './pages/About';
+import BodyUploadGenerator from './pages/BodyUploadGenerator';
 import './index.css';
-import GraalCodesModern from './pages/GraalCodesModern.jsx';
 
 function App() {
   return (
@@ -16,7 +16,7 @@ function App() {
         <Route path="/calculator" element={<Calculator />} />
         <Route path="/tracker" element={<SellablesTracker />} />
         <Route path="/about" element={<About />} />
-        <Route path="/codes" element={<GraalCodesModern />} />
+        <Route path="/body-generator" element={<BodyUploadGenerator />} />
       </Routes>
     </Router>
   );
