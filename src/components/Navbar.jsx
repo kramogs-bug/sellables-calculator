@@ -1,18 +1,40 @@
-import { createElement, useState } from 'react';
+import { createElement, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, Calculator, Home, Info, Layers3, Menu, X } from 'lucide-react';
+import { BarChart3, Calculator, Download, Home, Info, Layers3, Menu, X } from 'lucide-react';
 
 const navItems = [
-  { to: '/', label: 'Home', icon: Home },
-  { to: '/calculator', label: 'Calculator', icon: Calculator },
-  { to: '/tracker', label: 'Tracker', icon: BarChart3 },
-  { to: '/body-generator', label: 'Body Upload Generator', icon: Layers3 },
-  { to: '/about', label: 'About', icon: Info },
+  { to: '/', label: 'Home', icon: Home, preload: () => import('../pages/Home') },
+  { to: '/calculator', label: 'Calculator', icon: Calculator, preload: () => import('../pages/Calculator') },
+  { to: '/tracker', label: 'Tracker', icon: BarChart3, preload: () => import('../pages/SellablesTracker') },
+  { to: '/body-generator', label: 'Body Upload Generator', icon: Layers3, preload: () => import('../pages/BodyUploadGenerator') },
+  { to: '/about', label: 'About', icon: Info, preload: () => import('../pages/About') },
 ];
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState(null);
   const { pathname } = useLocation();
+
+  useEffect(() => {
+    const handleInstallPrompt = (event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+    const handleInstalled = () => setInstallPrompt(null);
+    window.addEventListener('beforeinstallprompt', handleInstallPrompt);
+    window.addEventListener('appinstalled', handleInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
+      window.removeEventListener('appinstalled', handleInstalled);
+    };
+  }, []);
+
+  const installApp = async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    await installPrompt.userChoice;
+    setInstallPrompt(null);
+  };
 
   return (
     <nav className="sticky top-0 z-50 border-b border-[#B1D3B9] bg-white" aria-label="Main navigation">
@@ -28,12 +50,14 @@ export default function Navbar() {
         </Link>
 
         <div className="hidden items-center gap-1 md:flex">
-          {navItems.map(({ to, label, icon }) => {
+          {navItems.map(({ to, label, icon, preload }) => {
             const active = pathname === to;
             return (
               <Link
                 key={to}
                 to={to}
+                onMouseEnter={preload}
+                onFocus={preload}
                 className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   active ? 'bg-[#659287] text-white' : 'text-[#527A70] hover:bg-[#E6F2DD] hover:text-[#29453E]'
                 }`}
@@ -44,6 +68,7 @@ export default function Navbar() {
               </Link>
             );
           })}
+          {installPrompt ? <button type="button" onClick={installApp} className="ml-1 flex items-center gap-2 rounded-lg border border-[#88BDA4] px-3 py-2 text-sm font-semibold text-[#527A70] hover:bg-[#E6F2DD]"><Download size={16} aria-hidden="true" /> Install</button> : null}
         </div>
 
         <button
@@ -59,13 +84,14 @@ export default function Navbar() {
 
       {isOpen ? (
         <div className="border-t border-[#B1D3B9] bg-white px-4 py-3 md:hidden">
-          {navItems.map(({ to, label, icon }) => {
+          {navItems.map(({ to, label, icon, preload }) => {
             const active = pathname === to;
             return (
               <Link
                 key={to}
                 to={to}
                 onClick={() => setIsOpen(false)}
+                onFocus={preload}
                 className={`mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
                   active ? 'bg-[#659287] text-white' : 'text-[#527A70] hover:bg-[#E6F2DD]'
                 }`}
@@ -76,6 +102,7 @@ export default function Navbar() {
               </Link>
             );
           })}
+          {installPrompt ? <button type="button" onClick={installApp} className="mt-2 flex w-full items-center gap-3 rounded-lg border border-[#88BDA4] px-3 py-2.5 text-sm font-semibold text-[#527A70] hover:bg-[#E6F2DD]"><Download size={18} aria-hidden="true" /> Install app</button> : null}
         </div>
       ) : null}
     </nav>

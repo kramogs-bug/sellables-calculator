@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Code2, Github, Mail, MessageCircle, Wrench } from 'lucide-react';
-import { sellablesIcons } from '../assets/assets';
+import profileImage from '../assets/profile.png';
 
 const skills = ['React & Next.js', 'JavaScript & TypeScript', 'Python', 'Game automation', 'Bot development', 'Computer vision'];
 
@@ -57,8 +57,9 @@ export default function About() {
           </div>
 
           <img
-            src={sellablesIcons.profile}
+            src={profileImage}
             alt="Kramogss profile"
+            decoding="async"
             className="size-36 rounded-2xl border-4 border-white object-cover shadow-sm sm:size-44"
           />
         </div>

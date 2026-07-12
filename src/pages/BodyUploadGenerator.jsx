@@ -19,6 +19,17 @@ import {
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPE = /^image\/(png|jpeg|webp)$/;
+const PREVIEW_SETTINGS_KEY = 'graalBodyPreviewSettings:v1';
+const DEFAULT_PREVIEW_SETTINGS = {
+  zoom: 5,
+  background: 'cream',
+  showHead: true,
+  cleanBackground: true,
+  previewMode: 'turntable',
+  headScale: 1,
+  headOffsetX: 0,
+  headOffsetY: 0,
+};
 const BACKGROUND_OPTIONS = [
   { value: 'cream', label: 'Cream' },
   { value: 'sage', label: 'Sage' },
@@ -34,6 +45,29 @@ const DEFAULT_CHARACTER_VIEWS = [
 ];
 
 const DEFAULT_CHARACTER_BY_ID = new Map(DEFAULT_CHARACTER_VIEWS.map((view) => [view.id, view]));
+
+function loadPreviewSettings() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PREVIEW_SETTINGS_KEY) || 'null');
+    if (!stored) return DEFAULT_PREVIEW_SETTINGS;
+    return {
+      zoom: [2, 3, 4, 5].includes(Number(stored.zoom)) ? Number(stored.zoom) : 5,
+      background: BACKGROUND_OPTIONS.some((option) => option.value === stored.background) ? stored.background : 'cream',
+      showHead: stored.showHead !== false,
+      cleanBackground: stored.cleanBackground !== false,
+      previewMode: stored.previewMode === 'grid' ? 'grid' : 'turntable',
+      headScale: Math.min(1.25, Math.max(0.75, Number(stored.headScale) || 1)),
+      headOffsetX: Math.min(8, Math.max(-8, Number(stored.headOffsetX) || 0)),
+      headOffsetY: Math.min(8, Math.max(-8, Number(stored.headOffsetY) || 0)),
+    };
+  } catch {
+    return DEFAULT_PREVIEW_SETTINGS;
+  }
+}
+
+function savePreviewSettings(settings) {
+  try { localStorage.setItem(PREVIEW_SETTINGS_KEY, JSON.stringify(settings)); } catch { /* Storage may be unavailable. */ }
+}
 
 function detectSpriteType(image) {
   if (inspectBodySheet(image).isStandardLayout) return 'body';
@@ -87,6 +121,7 @@ function SpriteUpload({ type, upload, info, error, onSelect, onClear }) {
             <img
               src={upload.url}
               alt={`Uploaded ${type} sprite sheet`}
+              decoding="async"
               className={`min-w-0 flex-1 rounded-md bg-[#F8FBF5] object-contain [image-rendering:pixelated] ${isBody ? 'h-40' : 'h-32'}`}
             />
             <button type="button" onClick={() => onClear(type)} className="rounded-lg p-2 text-red-700 hover:bg-red-50" aria-label={`Remove ${type} sprite sheet`}><X size={17} /></button>
@@ -110,6 +145,7 @@ function SpriteUpload({ type, upload, info, error, onSelect, onClear }) {
 }
 
 export default function BodyUploadGenerator() {
+  const [initialSettings] = useState(loadPreviewSettings);
   const canvasRef = useRef(null);
   const objectUrlsRef = useRef({ body: '', head: '' });
   const selectionVersionsRef = useRef({ body: 0, head: 0 });
@@ -121,11 +157,14 @@ export default function BodyUploadGenerator() {
   const [bodyInfo, setBodyInfo] = useState(null);
   const [headInfo, setHeadInfo] = useState(null);
   const [errors, setErrors] = useState({ body: '', head: '', preview: '' });
-  const [zoom, setZoom] = useState(5);
-  const [background, setBackground] = useState('cream');
-  const [showHead, setShowHead] = useState(true);
-  const [cleanBackground, setCleanBackground] = useState(true);
-  const [previewMode, setPreviewMode] = useState('turntable');
+  const [zoom, setZoom] = useState(initialSettings.zoom);
+  const [background, setBackground] = useState(initialSettings.background);
+  const [showHead, setShowHead] = useState(initialSettings.showHead);
+  const [cleanBackground, setCleanBackground] = useState(initialSettings.cleanBackground);
+  const [previewMode, setPreviewMode] = useState(initialSettings.previewMode);
+  const [headScale, setHeadScale] = useState(initialSettings.headScale);
+  const [headOffsetX, setHeadOffsetX] = useState(initialSettings.headOffsetX);
+  const [headOffsetY, setHeadOffsetY] = useState(initialSettings.headOffsetY);
   const [directionIndex, setDirectionIndex] = useState(0);
   const [autoRotate, setAutoRotate] = useState(false);
   const [status, setStatus] = useState('idle');
@@ -145,6 +184,9 @@ export default function BodyUploadGenerator() {
       cleanBackground,
       layout: previewMode,
       directionIndex,
+      headScale,
+      headOffsetX,
+      headOffsetY,
     })
       .then(() => {
         if (renderVersion === renderVersionRef.current) setStatus('ready');
@@ -159,7 +201,11 @@ export default function BodyUploadGenerator() {
     return () => {
       renderVersionRef.current += 1;
     };
-  }, [background, bodyUpload?.url, cleanBackground, directionIndex, headUpload?.url, previewMode, showHead, zoom]);
+  }, [background, bodyUpload?.url, cleanBackground, directionIndex, headOffsetX, headOffsetY, headScale, headUpload?.url, previewMode, showHead, zoom]);
+
+  useEffect(() => {
+    savePreviewSettings({ zoom, background, showHead, cleanBackground, previewMode, headScale, headOffsetX, headOffsetY });
+  }, [background, cleanBackground, headOffsetX, headOffsetY, headScale, previewMode, showHead, zoom]);
 
   useEffect(() => {
     if (!autoRotate || previewMode !== 'turntable') return undefined;
@@ -322,6 +368,9 @@ export default function BodyUploadGenerator() {
       setHeadUpload(null);
       setHeadInfo(null);
       setShowHead(true);
+      setHeadScale(1);
+      setHeadOffsetX(0);
+      setHeadOffsetY(0);
     }
   };
 
@@ -331,6 +380,9 @@ export default function BodyUploadGenerator() {
     setShowHead(true);
     setCleanBackground(true);
     setPreviewMode('turntable');
+    setHeadScale(1);
+    setHeadOffsetX(0);
+    setHeadOffsetY(0);
     setDirectionIndex(0);
     setAutoRotate(false);
   };
@@ -429,11 +481,11 @@ export default function BodyUploadGenerator() {
             >
               {bodyUpload ? <canvas ref={canvasRef} className="pointer-events-none size-full [image-rendering:pixelated]" aria-hidden="true" /> : previewMode === 'turntable' ? (
                 <div className="size-full bg-[radial-gradient(circle_at_center,_white_0%,_#F8FBF5_68%)] p-10 sm:p-14">
-                  <img src={DEFAULT_CHARACTER_BY_ID.get(TURNTABLE_VIEWS[directionIndex].id).url} alt="" className="size-full object-contain [image-rendering:pixelated]" />
+                  <img src={DEFAULT_CHARACTER_BY_ID.get(TURNTABLE_VIEWS[directionIndex].id).url} alt="" decoding="async" className="size-full object-contain [image-rendering:pixelated]" />
                 </div>
               ) : (
                 <div className="grid size-full grid-cols-2 gap-px bg-[#D7E9D7]">
-                  {DEFAULT_CHARACTER_VIEWS.map((view) => <div key={view.id} className="overflow-hidden bg-[#F8FBF5] p-3 sm:p-5"><img src={view.url} alt="" className="size-full object-contain [image-rendering:pixelated]" /></div>)}
+                  {DEFAULT_CHARACTER_VIEWS.map((view) => <div key={view.id} className="overflow-hidden bg-[#F8FBF5] p-3 sm:p-5"><img src={view.url} alt="" loading="lazy" decoding="async" className="size-full object-contain [image-rendering:pixelated]" /></div>)}
                 </div>
               )}
 
@@ -469,10 +521,29 @@ export default function BodyUploadGenerator() {
 
             <fieldset disabled={!bodyUpload} className="mt-4 space-y-4 disabled:opacity-50">
               {headUpload ? (
-                <button type="button" onClick={() => setShowHead((visible) => !visible)} className="flex w-full items-center justify-between rounded-lg border border-[#B1D3B9] px-3 py-2.5 text-sm font-semibold hover:bg-[#E6F2DD]">
-                  <span>{showHead ? 'Head is visible' : 'Head is hidden'}</span>
-                  {showHead ? <Eye size={17} aria-hidden="true" /> : <EyeOff size={17} aria-hidden="true" />}
-                </button>
+                <div className="space-y-4 rounded-lg border border-[#B1D3B9] p-3">
+                  <button type="button" onClick={() => setShowHead((visible) => !visible)} className="flex w-full items-center justify-between rounded-md text-sm font-semibold">
+                    <span>{showHead ? 'Head is visible' : 'Head is hidden'}</span>
+                    {showHead ? <Eye size={17} aria-hidden="true" /> : <EyeOff size={17} aria-hidden="true" />}
+                  </button>
+                  <div className={showHead ? 'space-y-4' : 'pointer-events-none opacity-45'} aria-disabled={!showHead}>
+                    <label className="block">
+                      <span className="flex items-center justify-between text-xs font-semibold"><span>Head size</span><span className="text-[#659287]">{Math.round(headScale * 100)}%</span></span>
+                      <input type="range" min="0.75" max="1.25" step="0.05" value={headScale} onChange={(event) => setHeadScale(Number(event.target.value))} className="mt-2 w-full accent-[#659287]" />
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block">
+                        <span className="flex items-center justify-between text-xs font-semibold"><span>Left / right</span><span className="text-[#659287]">{headOffsetX > 0 ? '+' : ''}{headOffsetX}px</span></span>
+                        <input type="range" min="-8" max="8" step="1" value={headOffsetX} onChange={(event) => setHeadOffsetX(Number(event.target.value))} className="mt-2 w-full accent-[#659287]" />
+                      </label>
+                      <label className="block">
+                        <span className="flex items-center justify-between text-xs font-semibold"><span>Up / down</span><span className="text-[#659287]">{headOffsetY > 0 ? '+' : ''}{headOffsetY}px</span></span>
+                        <input type="range" min="-8" max="8" step="1" value={headOffsetY} onChange={(event) => setHeadOffsetY(Number(event.target.value))} className="mt-2 w-full accent-[#659287]" />
+                      </label>
+                    </div>
+                    <button type="button" onClick={() => { setHeadScale(1); setHeadOffsetX(0); setHeadOffsetY(0); }} className="w-full rounded-md bg-[#E6F2DD] px-3 py-2 text-xs font-semibold text-[#527A70] hover:bg-[#D7E9D7]">Reset head fit</button>
+                  </div>
+                </div>
               ) : null}
 
               <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-[#B1D3B9] px-3 py-2.5 text-sm font-semibold hover:bg-[#E6F2DD]">

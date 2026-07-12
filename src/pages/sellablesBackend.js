@@ -1,4 +1,9 @@
-const STORAGE_KEY = 'graalTrackerDataV2';
+const STORAGE_KEY = 'graalTrackerData:v3';
+const PREVIOUS_STORAGE_KEY = 'graalTrackerDataV2';
+const BACKUP_HISTORY_KEY = 'graalTrackerBackupHistory:v1';
+const BACKUP_TYPE = 'graal-sellables-tracker-backup';
+const BACKUP_VERSION = 1;
+const MAX_LOCAL_BACKUPS = 5;
 const LEGACY_NAME_MAP = { NewsPaper: 'Newspaper', Crabshells: 'Crab Shell', Minerals: 'Mineral' };
 
 function localDateKey(value) {
@@ -17,7 +22,17 @@ function normalizeEntries(value) {
     const price = Number(entry?.price);
     const date = new Date(entry?.date);
     if (!entry || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(price) || price < 0 || Number.isNaN(date.getTime())) return [];
-    return [{ ...entry, id: entry.id ?? `${date.getTime()}-${entry.itemName}`, itemName: LEGACY_NAME_MAP[entry.itemName] || entry.itemName, quantity, price, total: quantity * price, date: date.toISOString(), note: typeof entry.note === 'string' ? entry.note.slice(0, 120) : '' }];
+    const itemName = typeof entry.itemName === 'string' ? (LEGACY_NAME_MAP[entry.itemName] || entry.itemName).slice(0, 80) : '';
+    if (!itemName) return [];
+    return [{
+      id: typeof entry.id === 'string' && entry.id ? entry.id.slice(0, 100) : `${date.getTime()}-${itemName}`,
+      itemName,
+      quantity,
+      price,
+      total: quantity * price,
+      date: date.toISOString(),
+      note: typeof entry.note === 'string' ? entry.note.slice(0, 120) : '',
+    }];
   });
 }
 
@@ -68,10 +83,76 @@ export function calculateGoalProgress(goal, totalEarned) {
   return { percentage: Math.min(100, (totalEarned / goal.amount) * 100), remaining: Math.max(0, goal.amount - totalEarned), daysRemaining };
 }
 
+function normalizeTrackerState(value) {
+  return {
+    entries: normalizeEntries(value?.entries),
+    goal: normalizeGoal(value?.goal),
+  };
+}
+
+function readBackupHistory() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(BACKUP_HISTORY_KEY) || '[]');
+    if (!Array.isArray(stored)) return [];
+    return stored.flatMap((backup) => {
+      const createdAt = new Date(backup?.createdAt);
+      if (Number.isNaN(createdAt.getTime()) || !backup?.state) return [];
+      return [{ id: String(backup.id || createdAt.getTime()), createdAt: createdAt.toISOString(), state: normalizeTrackerState(backup.state) }];
+    }).slice(0, MAX_LOCAL_BACKUPS);
+  } catch {
+    return [];
+  }
+}
+
+function saveBackupHistory(history) {
+  try { localStorage.setItem(BACKUP_HISTORY_KEY, JSON.stringify(history)); } catch { /* Storage may be unavailable. */ }
+}
+
+export function loadTrackerBackups() {
+  return readBackupHistory();
+}
+
+export function createTrackerBackup(state) {
+  return JSON.stringify({
+    type: BACKUP_TYPE,
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    data: normalizeTrackerState(state),
+  }, null, 2);
+}
+
+export function parseTrackerBackup(text) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error('This file is not valid JSON.');
+  }
+
+  const source = parsed?.type === BACKUP_TYPE ? parsed.data : parsed;
+  if (!source || !Array.isArray(source.entries)) throw new Error('This is not a valid tracker backup.');
+  const state = normalizeTrackerState(source);
+  if (source.entries.length !== state.entries.length) throw new Error('The backup contains invalid or incomplete entries.');
+  return state;
+}
+
+function escapeCsv(value) {
+  const text = String(value ?? '');
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+export function createTrackerCsv(entries) {
+  const rows = [['Date', 'Item', 'Quantity', 'Price', 'Total', 'Note']];
+  normalizeEntries(entries).forEach((entry) => {
+    rows.push([entry.date, entry.itemName, entry.quantity, entry.price, entry.total, entry.note]);
+  });
+  return rows.map((row) => row.map(escapeCsv).join(',')).join('\r\n');
+}
+
 export function loadTrackerState() {
   const fallback = { entries: [], goal: { amount: 0, targetDate: '', active: false } };
   try {
-    const currentValue = localStorage.getItem(STORAGE_KEY);
+    const currentValue = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(PREVIOUS_STORAGE_KEY);
     const stored = currentValue ? JSON.parse(currentValue) : null;
     if (!stored || !Array.isArray(stored.entries)) {
       return {
@@ -79,10 +160,21 @@ export function loadTrackerState() {
         goal: normalizeGoal(JSON.parse(localStorage.getItem('graalSellablesGoal') || 'null')),
       };
     }
-    return { entries: normalizeEntries(stored.entries), goal: normalizeGoal(stored.goal) };
+    return normalizeTrackerState(stored);
   } catch { return fallback; }
 }
 
 export function saveTrackerState(state) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* Storage may be unavailable. */ }
+  const normalized = normalizeTrackerState(state);
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized)); } catch { /* Storage may be unavailable. */ }
+
+  if (!normalized.entries.length && !normalized.goal.active) return readBackupHistory();
+  const history = readBackupHistory();
+  const serializedState = JSON.stringify(normalized);
+  if (history[0] && JSON.stringify(history[0].state) === serializedState) return history;
+
+  const createdAt = new Date().toISOString();
+  const nextHistory = [{ id: `${Date.now()}`, createdAt, state: normalized }, ...history].slice(0, MAX_LOCAL_BACKUPS);
+  saveBackupHistory(nextHistory);
+  return nextHistory;
 }

@@ -322,6 +322,9 @@ export async function renderBodyPreview(canvas, bodyImageUrl, headImageUrl, opti
   const hasRequestedBackground = Object.prototype.hasOwnProperty.call(BACKGROUNDS, options.background);
   const background = hasRequestedBackground ? BACKGROUNDS[options.background] : BACKGROUNDS.cream;
   const cleanBackground = options.cleanBackground !== false;
+  const headScale = Math.min(1.25, Math.max(0.75, Number(options.headScale) || 1));
+  const headOffsetX = Math.min(8, Math.max(-8, Number(options.headOffsetX) || 0));
+  const headOffsetY = Math.min(8, Math.max(-8, Number(options.headOffsetY) || 0));
   const context = canvas.getContext('2d');
 
   canvas.width = PREVIEW_SIZE;
@@ -393,15 +396,18 @@ export async function renderBodyPreview(canvas, bodyImageUrl, headImageUrl, opti
     );
 
     if (hasVisibleHead) {
+      const headTargetSize = Math.round(targetSize * headScale);
+      const headTargetX = Math.round(targetX + ((targetSize - headTargetSize) / 2) + (headOffsetX * pixelScale));
+      const headTargetY = Math.round(bodyTop - (headTargetSize / 2) + (headOffsetY * pixelScale));
       drawSpriteFrame(
         context,
         headImage,
         0,
         view.column * headSheet.frameSize,
         headSheet.frameSize,
-        targetX,
-        characterTop,
-        targetSize,
+        headTargetX,
+        headTargetY,
+        headTargetSize,
         cleanBackground,
       );
     }

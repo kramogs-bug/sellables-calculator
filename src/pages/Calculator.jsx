@@ -84,7 +84,7 @@ export default function Calculator() {
                       <div className="grid border-t border-[#D7E9D7] sm:grid-cols-2">
                         {category.items.map((item) => (
                           <div key={item.name} className="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3 border-b border-[#E6F2DD] p-3 sm:flex sm:p-4 sm:odd:border-r">
-                            <img src={item.icon} alt="" className="size-10 object-contain" />
+                            <img src={item.icon} alt="" loading="lazy" decoding="async" className="size-10 object-contain" />
                             <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.name}</p><p className="text-xs text-[#659287]">{formatNumber(item.price)} G each</p></div>
                             <div className="col-span-2 grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center overflow-hidden rounded-lg border border-[#B1D3B9] sm:ml-auto sm:flex">
                               <button type="button" onClick={() => changeQuantity(item.name, -1)} className="flex size-9 items-center justify-center text-[#527A70] hover:bg-[#E6F2DD]" aria-label={`Decrease ${item.name}`}><Minus size={14} /></button>

@@ -1,8 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { Calendar, Edit2, Plus, Target, Trash2, X } from 'lucide-react';
+import { Calendar, DatabaseBackup, Download, Edit2, Plus, Target, Trash2, Upload, X } from 'lucide-react';
 import { SELLABLE_BY_NAME, SELLABLE_CATEGORIES, SELLABLE_ITEMS } from './sellablesData.js';
 import { parseQuantity } from './calculatorBackend.js';
-import { calculateGoalProgress, calculateStatistics, formatNumber, groupEntriesByDate, loadTrackerState, parsePositiveNumber, saveTrackerState } from './sellablesBackend.js';
+import {
+  calculateGoalProgress,
+  calculateStatistics,
+  createTrackerBackup,
+  createTrackerCsv,
+  formatNumber,
+  groupEntriesByDate,
+  loadTrackerBackups,
+  loadTrackerState,
+  parsePositiveNumber,
+  parseTrackerBackup,
+  saveTrackerState,
+} from './sellablesBackend.js';
 
 const EMPTY_GOAL = { amount: 0, targetDate: '', active: false };
 
@@ -14,6 +26,15 @@ function getLocalDateInputValue() {
   const now = new Date();
   const offset = now.getTimezoneOffset() * 60000;
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function downloadTextFile(content, filename, type) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 export default function SellablesTracker() {
@@ -28,10 +49,15 @@ export default function SellablesTracker() {
   const [goalAmount, setGoalAmount] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const [deletingEntry, setDeletingEntry] = useState(null);
+  const [backupHistory, setBackupHistory] = useState(loadTrackerBackups);
+  const [selectedBackupId, setSelectedBackupId] = useState('');
+  const [backupFeedback, setBackupFeedback] = useState('');
+  const [pendingRestore, setPendingRestore] = useState(null);
   const formRef = useRef(null);
+  const importInputRef = useRef(null);
   const { entries, goal } = state;
 
-  useEffect(() => { saveTrackerState(state); }, [state]);
+  useEffect(() => { setBackupHistory(saveTrackerState(state)); }, [state]);
 
   const resetForm = () => {
     setFormOpen(false);
@@ -105,6 +131,55 @@ export default function SellablesTracker() {
     setGoalOpen(false);
   };
 
+  const exportBackup = () => {
+    const date = getLocalDateInputValue();
+    downloadTextFile(createTrackerBackup(state), `graal-tracker-backup-${date}.json`, 'application/json;charset=utf-8');
+    setBackupFeedback('JSON backup downloaded. Keep it somewhere safe.');
+  };
+
+  const exportCsv = () => {
+    const date = getLocalDateInputValue();
+    downloadTextFile(`\uFEFF${createTrackerCsv(entries)}`, `graal-tracker-history-${date}.csv`, 'text/csv;charset=utf-8');
+    setBackupFeedback('CSV history downloaded.');
+  };
+
+  const importBackup = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setBackupFeedback('Backup file must be 2 MB or smaller.');
+      return;
+    }
+
+    try {
+      const importedState = parseTrackerBackup(await file.text());
+      setPendingRestore({ state: importedState, label: `${file.name} (${importedState.entries.length} entries)` });
+      setBackupFeedback('');
+    } catch (error) {
+      setBackupFeedback(error instanceof Error ? error.message : 'The backup could not be imported.');
+    }
+  };
+
+  const selectedBackup = backupHistory.find((backup) => backup.id === selectedBackupId) || backupHistory[0] || null;
+
+  const requestLocalRestore = () => {
+    if (!selectedBackup) return;
+    const createdAt = new Date(selectedBackup.createdAt).toLocaleString();
+    setPendingRestore({ state: selectedBackup.state, label: `local recovery from ${createdAt} (${selectedBackup.state.entries.length} entries)` });
+    setBackupFeedback('');
+  };
+
+  const applyRestore = () => {
+    if (!pendingRestore) return;
+    setState(pendingRestore.state);
+    resetForm();
+    setGoalOpen(false);
+    setDeletingEntry(null);
+    setBackupFeedback(`Restored ${pendingRestore.state.entries.length} tracker entries.`);
+    setPendingRestore(null);
+  };
+
   const parsedPreviewQuantity = parseQuantity(quantity) || 0;
   const previewTotal = (SELLABLE_BY_NAME.get(itemName)?.price || 0) * parsedPreviewQuantity;
   const statistics = calculateStatistics(entries);
@@ -128,6 +203,21 @@ export default function SellablesTracker() {
         </div>
       ) : null}
 
+      {pendingRestore ? (
+        <div className="fixed inset-0 z-[60] flex items-end bg-[#29453E]/50 p-3 sm:items-center sm:justify-center" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingRestore(null); }}>
+          <section className="w-full rounded-2xl bg-white p-5 shadow-xl sm:max-w-md sm:p-6" role="dialog" aria-modal="true" aria-labelledby="restore-title">
+            <div className="flex items-start justify-between gap-4">
+              <div><h2 id="restore-title" className="text-lg font-semibold">Replace tracker data?</h2><p className="mt-2 text-sm leading-6 text-[#527A70]">Restore {pendingRestore.label}. Your current data remains available in the automatic local recovery history.</p></div>
+              <button type="button" onClick={() => setPendingRestore(null)} className="rounded-lg p-2 hover:bg-[#E6F2DD]" aria-label="Close restore confirmation"><X size={18} /></button>
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button type="button" onClick={() => setPendingRestore(null)} className="rounded-lg border border-[#B1D3B9] px-4 py-3 text-sm font-semibold hover:bg-[#E6F2DD]">Cancel</button>
+              <button type="button" onClick={applyRestore} className="rounded-lg bg-[#659287] px-4 py-3 text-sm font-semibold text-white hover:bg-[#527A70]">Restore data</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       <section className="mx-auto max-w-7xl px-3 py-6 sm:px-6 sm:py-10 lg:px-8">
         <header className="flex flex-col gap-4 border-b border-[#B1D3B9] pb-6 sm:gap-6 sm:pb-8 md:flex-row md:items-end md:justify-between">
           <div>
@@ -137,6 +227,30 @@ export default function SellablesTracker() {
           </div>
           <button type="button" onClick={openNewEntryForm} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#659287] px-5 py-3 text-sm font-semibold text-white hover:bg-[#527A70]"><Plus size={17} /> Add entry</button>
         </header>
+
+        <section className="mt-5 rounded-xl border border-[#B1D3B9] bg-white p-4 sm:mt-6 sm:p-5" aria-labelledby="backup-heading">
+          <div className="flex items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#E6F2DD] text-[#659287]"><DatabaseBackup size={19} aria-hidden="true" /></span>
+            <div><h2 id="backup-heading" className="font-semibold">Data backup</h2><p className="mt-1 text-xs leading-5 text-[#659287]">Your tracker stays on this device. Download a backup before clearing browser data or changing phones.</p></div>
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <button type="button" onClick={exportBackup} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#659287] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#527A70]"><Download size={16} aria-hidden="true" /> JSON backup</button>
+            <button type="button" onClick={exportCsv} disabled={!entries.length} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#88BDA4] px-4 py-2.5 text-sm font-semibold text-[#527A70] hover:bg-[#E6F2DD] disabled:cursor-not-allowed disabled:opacity-50"><Download size={16} aria-hidden="true" /> CSV history</button>
+            <button type="button" onClick={() => importInputRef.current?.click()} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#88BDA4] px-4 py-2.5 text-sm font-semibold text-[#527A70] hover:bg-[#E6F2DD]"><Upload size={16} aria-hidden="true" /> Import backup</button>
+            <input ref={importInputRef} type="file" accept="application/json,.json" onChange={importBackup} className="sr-only" />
+          </div>
+          {backupHistory.length ? (
+            <div className="mt-3 grid gap-2 rounded-lg bg-[#F2F8ED] p-3 sm:grid-cols-[1fr_auto] sm:items-end">
+              <label className="text-xs font-semibold text-[#527A70]">Automatic local recovery
+                <select value={selectedBackup?.id || ''} onChange={(event) => setSelectedBackupId(event.target.value)} className="mt-1.5 w-full rounded-lg border border-[#B1D3B9] bg-white px-3 py-2 text-sm font-medium text-[#29453E]">
+                  {backupHistory.map((backup) => <option key={backup.id} value={backup.id}>{new Date(backup.createdAt).toLocaleString()} - {backup.state.entries.length} entries</option>)}
+                </select>
+              </label>
+              <button type="button" onClick={requestLocalRestore} className="rounded-lg border border-[#88BDA4] bg-white px-4 py-2 text-sm font-semibold text-[#527A70] hover:bg-[#E6F2DD]">Restore selected</button>
+            </div>
+          ) : null}
+          {backupFeedback ? <p className="mt-3 rounded-lg bg-[#E6F2DD] px-3 py-2 text-sm font-medium text-[#527A70]" role="status">{backupFeedback}</p> : null}
+        </section>
 
         {formOpen ? (
           <form ref={formRef} onSubmit={submitEntry} className="scroll-mt-20 mt-5 rounded-xl border border-[#B1D3B9] bg-white p-4 sm:mt-6 sm:p-6">
@@ -173,8 +287,8 @@ export default function SellablesTracker() {
                 {group.entries.map((entry) => {
                   const item = SELLABLE_BY_NAME.get(entry.itemName);
                   return (
-                    <div key={entry.id} className="grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 border-t border-[#E6F2DD] p-3 sm:grid-cols-[2.25rem_minmax(0,1fr)_auto_auto] sm:p-4">
-                      {item?.icon ? <img src={item.icon} alt="" className="size-9 object-contain" /> : <span className="size-9 rounded-lg bg-[#E6F2DD]" />}
+                    <div key={entry.id} className="grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 border-t border-[#E6F2DD] p-3 [contain-intrinsic-size:0_76px] [content-visibility:auto] sm:grid-cols-[2.25rem_minmax(0,1fr)_auto_auto] sm:p-4">
+                      {item?.icon ? <img src={item.icon} alt="" loading="lazy" decoding="async" className="size-9 object-contain" /> : <span className="size-9 rounded-lg bg-[#E6F2DD]" />}
                       <div className="min-w-0"><p className="truncate text-sm font-semibold">{entry.itemName} · {formatNumber(entry.quantity)}</p>{entry.note ? <p className="truncate text-xs text-[#659287]">{entry.note}</p> : <p className="text-xs text-[#88BDA4]">{formatNumber(entry.price)} G each</p>}</div>
                       <strong className="whitespace-nowrap text-sm">{formatNumber(entry.total)} G</strong>
                       <div className="col-span-3 grid grid-cols-2 gap-2 sm:col-span-1 sm:flex"><button type="button" onClick={() => editEntry(entry)} className="inline-flex items-center justify-center gap-2 rounded-md bg-[#E6F2DD] px-3 py-2 text-xs font-semibold text-[#527A70]" aria-label={`Edit ${entry.itemName}`}><Edit2 size={14} /> Edit</button><button type="button" onClick={() => setDeletingEntry(entry)} className="inline-flex items-center justify-center gap-2 rounded-md bg-red-50 px-3 py-2 text-xs font-semibold text-red-700" aria-label={`Delete ${entry.itemName}`}><Trash2 size={14} /> Delete</button></div>
