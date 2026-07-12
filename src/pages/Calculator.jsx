@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Calculator as CalculatorIcon, ChevronDown, Minus, Plus, RotateCcw, Search } from 'lucide-react';
+import MobileCalculatorKeypad from '../components/MobileCalculatorKeypad.jsx';
+import useMobileCalculatorKeypad from '../hooks/useMobileCalculatorKeypad.js';
 import { SELLABLE_CATEGORIES, SELLABLE_ITEMS } from './sellablesData.js';
-import { calculateTotal, formatNumber, loadCalculatorState, parseQuantity, saveCalculatorState } from './calculatorBackend.js';
+import { appendDecimalKey as buildDecimalInput, appendQuantityKey as buildQuantityExpression, calculateTotal, formatNumber, loadCalculatorState, parseQuantity, saveCalculatorState } from './calculatorBackend.js';
 
 export default function Calculator() {
   const [state, setState] = useState(loadCalculatorState);
@@ -9,6 +11,8 @@ export default function Calculator() {
   const [quantityInputs, setQuantityInputs] = useState(() => Object.fromEntries(Object.entries(state.quantities).map(([name, value]) => [name, String(value)])));
   const [ratioInput, setRatioInput] = useState(() => String(state.ratio));
   const [openCategories, setOpenCategories] = useState(() => Object.fromEntries(SELLABLE_CATEGORIES.map(({ key }) => [key, true])));
+  const [activeKeypad, setActiveKeypad] = useState(null);
+  const usesMobileKeypad = useMobileCalculatorKeypad();
   const { quantities, ratio } = state;
 
   useEffect(() => { saveCalculatorState(state); }, [state]);
@@ -41,8 +45,55 @@ export default function Calculator() {
     setState((current) => ({ ...current, ratio: nextRatio }));
     setRatioInput(String(nextRatio));
   };
+
+  const openQuantityKeypad = (name) => {
+    if (usesMobileKeypad) setActiveKeypad({ type: 'quantity', name });
+  };
+
+  const openRatioKeypad = () => {
+    if (usesMobileKeypad) setActiveKeypad({ type: 'ratio' });
+  };
+
+  const appendQuantityKey = (name, key) => {
+    const current = quantityInputs[name] || '';
+    const next = buildQuantityExpression(current, key);
+    if (next !== current) updateQuantity(name, next);
+  };
+
+  const appendRatioKey = (key) => {
+    const next = buildDecimalInput(ratioInput, key);
+    if (next !== ratioInput) updateRatio(next);
+  };
+
+  const closeKeypad = () => {
+    if (activeKeypad?.type === 'quantity') commitQuantity(activeKeypad.name);
+    if (activeKeypad?.type === 'ratio') commitRatio();
+    setActiveKeypad(null);
+  };
+
+  const moveKeypad = (step) => {
+    if (activeKeypad?.type !== 'quantity') return;
+    const index = SELLABLE_ITEMS.findIndex((item) => item.name === activeKeypad.name);
+    const nextItem = SELLABLE_ITEMS[index + step];
+    if (!nextItem) return;
+    commitQuantity(activeKeypad.name);
+    setActiveKeypad({ type: 'quantity', name: nextItem.name });
+  };
   const total = calculateTotal(quantities, SELLABLE_ITEMS);
   const troValue = ratio > 0 ? total / ratio : 0;
+  const activeItemIndex = activeKeypad?.type === 'quantity'
+    ? SELLABLE_ITEMS.findIndex((item) => item.name === activeKeypad.name)
+    : -1;
+  const activeItem = activeItemIndex >= 0 ? SELLABLE_ITEMS[activeItemIndex] : null;
+  const activeExpression = activeItem ? (quantityInputs[activeItem.name] || '') : ratioInput;
+  const activeQuantity = activeItem ? parseQuantity(activeExpression) : null;
+  const expressionStatus = activeItem
+    ? activeQuantity === null
+      ? 'Incomplete expression'
+      : `${formatNumber(activeQuantity)} items \u00B7 ${formatNumber(activeQuantity * activeItem.price)} G`
+    : Number(ratioInput) > 0
+      ? `${formatNumber(Number(ratioInput))} G per Tro`
+      : 'Enter a ratio';
   const normalizedQuery = query.trim().toLowerCase();
   const categories = SELLABLE_CATEGORIES.map((category) => ({
     ...category,
@@ -58,7 +109,7 @@ export default function Calculator() {
             <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-4xl">Calculate your total</h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-[#527A70] sm:mt-3 sm:text-base">Enter a quantity or expression like 100+200. Totals update live and stay saved on this device.</p>
           </div>
-          <button type="button" onClick={() => { setState((current) => ({ ...current, quantities: {} })); setQuantityInputs({}); }} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#88BDA4] bg-white px-4 py-2.5 text-sm font-semibold text-[#527A70] hover:bg-[#D7E9D7]">
+          <button type="button" onClick={() => { setState((current) => ({ ...current, quantities: {} })); setQuantityInputs({}); setActiveKeypad(null); }} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#88BDA4] bg-white px-4 py-2.5 text-sm font-semibold text-[#527A70] hover:bg-[#D7E9D7]">
             <RotateCcw size={16} aria-hidden="true" /> Reset quantities
           </button>
         </header>
@@ -88,7 +139,7 @@ export default function Calculator() {
                             <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.name}</p><p className="text-xs text-[#659287]">{formatNumber(item.price)} G each</p></div>
                             <div className="col-span-2 grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center overflow-hidden rounded-lg border border-[#B1D3B9] sm:ml-auto sm:flex">
                               <button type="button" onClick={() => changeQuantity(item.name, -1)} className="flex size-9 items-center justify-center text-[#527A70] hover:bg-[#E6F2DD]" aria-label={`Decrease ${item.name}`}><Minus size={14} /></button>
-                              <input type="text" inputMode="text" value={quantityInputs[item.name] || ''} onChange={(event) => updateQuantity(item.name, event.target.value)} onBlur={() => commitQuantity(item.name)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} placeholder="0 or 100+200" className="min-w-0 border-x border-[#B1D3B9] py-2 text-center text-sm outline-none sm:w-24" aria-label={`${item.name} quantity or expression`} />
+                              <input type="text" inputMode={usesMobileKeypad ? 'none' : 'text'} readOnly={usesMobileKeypad} value={quantityInputs[item.name] || ''} onFocus={() => openQuantityKeypad(item.name)} onClick={() => openQuantityKeypad(item.name)} onChange={(event) => updateQuantity(item.name, event.target.value)} onBlur={() => { if (!usesMobileKeypad) commitQuantity(item.name); }} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} placeholder="0 or 100+200" className={`min-w-0 border-x border-[#B1D3B9] py-2 text-center text-sm outline-none sm:w-24 ${usesMobileKeypad ? 'cursor-pointer bg-[#F8FBF5]' : ''}`} aria-label={`${item.name} quantity or expression`} aria-haspopup={usesMobileKeypad ? 'dialog' : undefined} />
                               <button type="button" onClick={() => changeQuantity(item.name, 1)} className="flex size-9 items-center justify-center text-[#527A70] hover:bg-[#E6F2DD]" aria-label={`Increase ${item.name}`}><Plus size={14} /></button>
                             </div>
                           </div>
@@ -108,7 +159,7 @@ export default function Calculator() {
             <p className="mt-1 text-4xl font-bold">{formatNumber(total)} G</p>
             <div className="my-6 border-t border-white/20" />
             <label className="block text-sm font-medium text-[#E6F2DD]" htmlFor="tro-ratio">Gralats per Tro</label>
-            <input id="tro-ratio" type="text" inputMode="decimal" value={ratioInput} onChange={(event) => updateRatio(event.target.value)} onBlur={commitRatio} className="mt-2 w-full rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-white outline-none focus:bg-white/20" />
+            <input id="tro-ratio" type="text" inputMode={usesMobileKeypad ? 'none' : 'decimal'} readOnly={usesMobileKeypad} value={ratioInput} onFocus={openRatioKeypad} onClick={openRatioKeypad} onChange={(event) => updateRatio(event.target.value)} onBlur={() => { if (!usesMobileKeypad) commitRatio(); }} className="mt-2 w-full rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-white outline-none focus:bg-white/20" aria-haspopup={usesMobileKeypad ? 'dialog' : undefined} />
             <div className="mt-5 rounded-lg bg-white/10 p-4"><p className="text-xs text-[#E6F2DD]">Equivalent value</p><p className="mt-1 text-xl font-semibold">{formatNumber(troValue)} Tro</p></div>
           </aside>
         </div>
@@ -124,7 +175,7 @@ export default function Calculator() {
           <div className="grid grid-cols-[auto_auto] items-end gap-x-3">
             <label className="text-left text-[11px] font-medium text-[#E6F2DD]" htmlFor="mobile-tro-ratio">
               Ratio
-              <input id="mobile-tro-ratio" type="text" inputMode="decimal" value={ratioInput} onChange={(event) => updateRatio(event.target.value)} onBlur={commitRatio} className="mt-1 block w-16 rounded-md border border-white/30 bg-white/10 px-2 py-1.5 text-center text-sm font-semibold text-white outline-none focus:bg-white/20" />
+              <input id="mobile-tro-ratio" type="text" inputMode={usesMobileKeypad ? 'none' : 'decimal'} readOnly={usesMobileKeypad} value={ratioInput} onFocus={openRatioKeypad} onClick={openRatioKeypad} onChange={(event) => updateRatio(event.target.value)} onBlur={() => { if (!usesMobileKeypad) commitRatio(); }} className={`mt-1 block w-16 rounded-md border border-white/30 bg-white/10 px-2 py-1.5 text-center text-sm font-semibold text-white outline-none focus:bg-white/20 ${usesMobileKeypad ? 'cursor-pointer' : ''}`} aria-haspopup={usesMobileKeypad ? 'dialog' : undefined} />
             </label>
             <div className="min-w-0 text-right">
               <p className="text-[11px] font-medium text-[#E6F2DD]">Equivalent</p>
@@ -133,6 +184,26 @@ export default function Calculator() {
           </div>
         </div>
       </aside>
+
+      <MobileCalculatorKeypad
+        open={usesMobileKeypad && Boolean(activeKeypad)}
+        mode={activeKeypad?.type || 'quantity'}
+        title={activeItem?.name || 'Gralats per Tro'}
+        subtitle={activeItem ? `${formatNumber(activeItem.price)} G each` : 'Used for the Tro equivalent'}
+        expression={activeExpression}
+        expressionStatus={expressionStatus}
+        total={`${formatNumber(total)} G`}
+        equivalent={`${formatNumber(troValue)} Tro`}
+        canGoPrevious={activeItemIndex > 0}
+        canGoNext={activeItemIndex >= 0 && activeItemIndex < SELLABLE_ITEMS.length - 1}
+        onKey={(key) => { if (activeItem) appendQuantityKey(activeItem.name, key); else appendRatioKey(key); }}
+        onClear={() => { if (activeItem) updateQuantity(activeItem.name, ''); else updateRatio(''); }}
+        onBackspace={() => { if (activeItem) updateQuantity(activeItem.name, activeExpression.slice(0, -1)); else updateRatio(ratioInput.slice(0, -1)); }}
+        onPrevious={() => moveKeypad(-1)}
+        onNext={() => moveKeypad(1)}
+        onApply={closeKeypad}
+        onClose={closeKeypad}
+      />
     </main>
   );
 }

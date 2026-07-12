@@ -64,6 +64,50 @@ export function parseQuantity(value) {
   } catch { return null; }
 }
 
+export function appendQuantityKey(currentValue, key, maximumLength = 40) {
+  const current = String(currentValue ?? '');
+  if (!key || current.length >= maximumLength) return current;
+  const trimmed = current.trimEnd();
+  const lastCharacter = trimmed.at(-1) || '';
+  const operators = ['+', '-', '*', '/'];
+
+  if (operators.includes(key)) {
+    if (!trimmed || lastCharacter === '(' || lastCharacter === '.') return current;
+    return operators.includes(lastCharacter)
+      ? `${trimmed.slice(0, -1)}${key}`
+      : `${trimmed}${key}`;
+  }
+
+  if (key === '.') {
+    if (lastCharacter === ')') return current;
+    const currentNumber = trimmed.split(/[+\-*/()]/).at(-1) || '';
+    if (currentNumber.includes('.')) return current;
+    return `${trimmed}${currentNumber ? '.' : '0.'}`;
+  }
+
+  if (key === '(') {
+    if (trimmed && /[\d.)]/.test(lastCharacter)) return current;
+    return `${trimmed}(`;
+  }
+
+  if (key === ')') {
+    const openCount = (trimmed.match(/\(/g) || []).length;
+    const closeCount = (trimmed.match(/\)/g) || []).length;
+    if (openCount <= closeCount || !/[\d)]/.test(lastCharacter)) return current;
+    return `${trimmed})`;
+  }
+
+  if (!/^\d{1,2}$/.test(key) || lastCharacter === ')' || current.length + key.length > maximumLength) return current;
+  return `${current}${key}`;
+}
+
+export function appendDecimalKey(currentValue, key, maximumLength = 10) {
+  const current = String(currentValue ?? '');
+  if (!/^\d{1,2}$/.test(key) && key !== '.') return current;
+  if (current.length + key.length > maximumLength || (key === '.' && current.includes('.'))) return current;
+  return key === '.' && !current ? '0.' : `${current}${key}`;
+}
+
 export function formatNumber(value, maximumFractionDigits = 2) {
   const number = Number(value);
   return Number.isFinite(number) ? number.toLocaleString('en-US', { maximumFractionDigits }) : '0';
