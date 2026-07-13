@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { createElement } from 'react';
-import { ArrowRight, BarChart3, Calculator, Check, Package } from 'lucide-react';
+import { ArrowRight, BarChart3, Calculator, Check, Layers3, Package } from 'lucide-react';
 
 const features = [
   {
@@ -17,6 +17,11 @@ const features = [
     icon: BarChart3,
     title: 'Simple tracking',
     description: 'Track your progress without clutter, unnecessary effects, or complicated controls.',
+  },
+  {
+    icon: Layers3,
+    title: 'Private upload preview',
+    description: 'Check how a head and body fit together. Images stay on your device and are never uploaded.',
   },
 ];
 
@@ -47,10 +52,16 @@ export default function Home() {
             >
               View tracker
             </Link>
+            <Link
+              to="/body-generator"
+              className="inline-flex items-center justify-center rounded-lg border border-[#88BDA4] bg-white px-5 py-3 text-sm font-semibold text-[#46675F] hover:bg-[#D7E9D7]"
+            >
+              Preview an upload
+            </Link>
           </div>
         </div>
 
-        <div className="mt-16 grid gap-5 md:grid-cols-3">
+        <div className="mt-16 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
           {features.map(({ icon, title, description }) => (
             <article key={title} className="rounded-xl border border-[#B1D3B9] bg-white p-6">
               <span className="mb-5 flex size-10 items-center justify-center rounded-lg bg-[#E6F2DD] text-[#659287]">
@@ -69,6 +80,7 @@ export default function Home() {
               {item}
             </span>
           ))}
+          <Link to="/privacy" className="font-semibold text-[#527A70] underline decoration-[#88BDA4] underline-offset-4 hover:text-[#29453E]">Privacy policy</Link>
         </div>
       </section>
     </main>

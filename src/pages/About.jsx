@@ -1,9 +1,9 @@
 import { createElement } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Check, Code2, Github, Mail, MessageCircle, Wrench } from 'lucide-react';
+import { ArrowRight, Check, Code2, Github, Mail, MessageCircle, ShieldCheck, Wrench } from 'lucide-react';
 import profileImage from '../assets/profile.png';
 
-const skills = ['React & Next.js', 'JavaScript & TypeScript', 'Python', 'Game automation', 'Bot development', 'Computer vision'];
+const skills = ['React', 'JavaScript', 'Tailwind CSS', 'Android & Capacitor', 'Local-first tools', 'UI/UX'];
 
 const projects = [
   {
@@ -114,6 +114,17 @@ export default function About() {
                 )}
               </article>
             ))}
+          </div>
+        </section>
+
+        <section className="mt-16 rounded-xl border border-[#B1D3B9] bg-white p-6 sm:p-8" aria-labelledby="independent-tool-heading">
+          <div className="flex items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#E6F2DD] text-[#659287]"><ShieldCheck size={20} aria-hidden="true" /></span>
+            <div>
+              <h2 id="independent-tool-heading" className="text-xl font-semibold">Independent and privacy-first</h2>
+              <p className="mt-2 text-sm leading-6 text-[#5B766F]">This is an unofficial, fan-made utility and is not affiliated with or endorsed by GraalOnline or its publishers. Calculator records and preview images stay on your device.</p>
+              <Link to="/privacy" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#527A70] hover:text-[#29453E]">Read the privacy policy <ArrowRight size={16} aria-hidden="true" /></Link>
+            </div>
           </div>
         </section>
 

@@ -1,6 +1,7 @@
 const imageCache = new Map();
 const cleanedFrameCache = new WeakMap();
-const BACKGROUND_TOLERANCE = 36;
+const BACKGROUND_TOLERANCE = 52;
+const MINIMUM_OPAQUE_BORDER_COVERAGE = 0.72;
 
 export const BODY_VIEWS = [
   { id: 'front', label: 'Front', column: 2 },
@@ -196,42 +197,48 @@ function colorsMatch(data, offset, background) {
     && Math.abs(data[offset + 2] - background[2]) <= BACKGROUND_TOLERANCE;
 }
 
-function dominantCornerColor(data, width, height) {
-  const cornerOffsets = [
-    0,
-    width - 1,
-    (height - 1) * width,
-    (height * width) - 1,
-  ].map((pixelIndex) => pixelIndex * 4);
+function dominantBorderColor(data, width, height) {
+  const borderOffsets = [];
+  for (let x = 0; x < width; x += 1) {
+    borderOffsets.push(x * 4);
+    if (height > 1) borderOffsets.push((((height - 1) * width) + x) * 4);
+  }
+  for (let y = 1; y < height - 1; y += 1) {
+    borderOffsets.push((y * width) * 4);
+    if (width > 1) borderOffsets.push(((y * width) + width - 1) * 4);
+  }
 
-  if (cornerOffsets.some((offset) => data[offset + 3] <= 8)) return null;
+  const opaqueOffsets = borderOffsets.filter((offset) => data[offset + 3] > 8);
+  if (opaqueOffsets.length < borderOffsets.length * MINIMUM_OPAQUE_BORDER_COVERAGE) return null;
 
-  const cornerPixels = cornerOffsets
-    .map((offset) => [data[offset], data[offset + 1], data[offset + 2]]);
-
-  if (!cornerPixels.length) return null;
-
-  let bestColor = cornerPixels[0];
-  let bestMatches = 0;
-  cornerPixels.forEach((candidate) => {
-    const matches = cornerPixels.filter((color) => (
-      Math.abs(color[0] - candidate[0]) <= 12
-      && Math.abs(color[1] - candidate[1]) <= 12
-      && Math.abs(color[2] - candidate[2]) <= 12
-    )).length;
-    if (matches > bestMatches) {
-      bestColor = candidate;
-      bestMatches = matches;
-    }
+  const colorGroups = new Map();
+  opaqueOffsets.forEach((offset) => {
+    const key = `${data[offset] >> 5}:${data[offset + 1] >> 5}:${data[offset + 2] >> 5}`;
+    const group = colorGroups.get(key) || { count: 0, red: 0, green: 0, blue: 0 };
+    group.count += 1;
+    group.red += data[offset];
+    group.green += data[offset + 1];
+    group.blue += data[offset + 2];
+    colorGroups.set(key, group);
   });
 
-  return bestColor;
+  let dominant = null;
+  colorGroups.forEach((group) => {
+    if (!dominant || group.count > dominant.count) dominant = group;
+  });
+  if (!dominant || dominant.count < opaqueOffsets.length * 0.25) return null;
+
+  return [
+    Math.round(dominant.red / dominant.count),
+    Math.round(dominant.green / dominant.count),
+    Math.round(dominant.blue / dominant.count),
+  ];
 }
 
 function removeConnectedBackground(context, width, height) {
   const pixels = context.getImageData(0, 0, width, height);
   const { data } = pixels;
-  const background = dominantCornerColor(data, width, height);
+  const background = dominantBorderColor(data, width, height);
   if (!background) return;
 
   const visited = new Uint8Array(width * height);
@@ -308,16 +315,16 @@ function drawSpriteFrame(context, image, sourceX, sourceY, sourceSize, targetX, 
 }
 
 export async function renderBodyPreview(canvas, bodyImageUrl, headImageUrl, options = {}) {
-  if (!canvas || !bodyImageUrl) return;
+  if (!canvas || (!bodyImageUrl && !headImageUrl)) return;
 
   const [bodyImage, headImage] = await Promise.all([
-    loadImage(bodyImageUrl),
+    bodyImageUrl ? loadImage(bodyImageUrl) : Promise.resolve(null),
     headImageUrl ? loadImage(headImageUrl) : Promise.resolve(null),
   ]);
-  const bodySheet = inspectBodySheet(bodyImage);
+  const bodySheet = bodyImage ? inspectBodySheet(bodyImage) : null;
   const headSheet = headImage ? inspectHeadSheet(headImage) : null;
   const requestedRow = Math.floor(Number(options.row) || 0);
-  const row = Math.min(bodySheet.rowCount - 1, Math.max(0, requestedRow));
+  const row = bodySheet ? Math.min(bodySheet.rowCount - 1, Math.max(0, requestedRow)) : 0;
   const zoom = Math.min(5, Math.max(2, Number(options.zoom) || 5));
   const hasRequestedBackground = Object.prototype.hasOwnProperty.call(BACKGROUNDS, options.background);
   const background = hasRequestedBackground ? BACKGROUNDS[options.background] : BACKGROUNDS.cream;
@@ -354,19 +361,21 @@ export async function renderBodyPreview(canvas, bodyImageUrl, headImageUrl, opti
       }
     }
 
+    const hasVisibleBody = Boolean(bodyImage && bodySheet);
     const hasVisibleHead = Boolean(headImage && headSheet && options.showHead !== false);
-    const characterHeightInFrames = hasVisibleHead ? 1.5 : 1;
+    const characterHeightInFrames = hasVisibleBody && hasVisibleHead ? 1.5 : 1;
+    const sourceFrameSize = bodySheet?.frameSize || headSheet?.frameSize || 32;
     const padding = isTurntable ? 144 : 48;
-    const maximumScale = Math.max(1, Math.floor((cellSize - padding) / (bodySheet.frameSize * characterHeightInFrames)));
+    const maximumScale = Math.max(1, Math.floor((cellSize - padding) / (sourceFrameSize * characterHeightInFrames)));
     const desiredScale = isTurntable ? zoom * 2 : zoom;
     const pixelScale = Math.min(desiredScale, maximumScale);
-    const targetSize = Math.round(bodySheet.frameSize * pixelScale);
+    const targetSize = Math.round(sourceFrameSize * pixelScale);
     const characterHeight = Math.round(targetSize * characterHeightInFrames);
     const targetX = Math.round(cellX + (cellSize - targetSize) / 2);
     const characterTop = Math.round(cellY + (cellSize - characterHeight) / 2 - (isTurntable ? 12 : 0));
-    const bodyTop = hasVisibleHead ? characterTop + Math.round(targetSize / 2) : characterTop;
+    const bodyTop = hasVisibleBody && hasVisibleHead ? characterTop + Math.round(targetSize / 2) : characterTop;
 
-    if (isTurntable && background) {
+    if (isTurntable && background && hasVisibleBody) {
       context.save();
       context.fillStyle = 'rgba(41, 69, 62, 0.14)';
       context.beginPath();
@@ -383,22 +392,26 @@ export async function renderBodyPreview(canvas, bodyImageUrl, headImageUrl, opti
       context.restore();
     }
 
-    drawSpriteFrame(
-      context,
-      bodyImage,
-      view.column * bodySheet.frameSize,
-      row * bodySheet.frameSize,
-      bodySheet.frameSize,
-      targetX,
-      bodyTop,
-      targetSize,
-      cleanBackground,
-    );
+    if (hasVisibleBody) {
+      drawSpriteFrame(
+        context,
+        bodyImage,
+        view.column * bodySheet.frameSize,
+        row * bodySheet.frameSize,
+        bodySheet.frameSize,
+        targetX,
+        bodyTop,
+        targetSize,
+        cleanBackground,
+      );
+    }
 
     if (hasVisibleHead) {
       const headTargetSize = Math.round(targetSize * headScale);
       const headTargetX = Math.round(targetX + ((targetSize - headTargetSize) / 2) + (headOffsetX * pixelScale));
-      const headTargetY = Math.round(bodyTop - (headTargetSize / 2) + (headOffsetY * pixelScale));
+      const headTargetY = hasVisibleBody
+        ? Math.round(bodyTop - (headTargetSize / 2) + (headOffsetY * pixelScale))
+        : Math.round(cellY + ((cellSize - headTargetSize) / 2) + (headOffsetY * pixelScale) - (isTurntable ? 12 : 0));
       drawSpriteFrame(
         context,
         headImage,

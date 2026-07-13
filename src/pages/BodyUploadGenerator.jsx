@@ -86,8 +86,8 @@ function wrapDirection(index) {
 
 function SpriteUpload({ type, upload, info, error, onSelect, onClear }) {
   const isBody = type === 'body';
-  const title = isBody ? '1. Upload body sheet' : '2. Add head sheet';
-  const description = isBody ? 'Required - standard 128 x 720' : 'Optional - standard 32 x 560';
+  const title = isBody ? '1. Upload body sheet' : '2. Upload head sheet';
+  const description = isBody ? 'Optional - standard 128 x 720' : 'Optional - standard 32 x 560';
   const prompt = isBody ? 'Choose body sheet' : 'Choose head sheet';
 
   return (
@@ -171,12 +171,12 @@ export default function BodyUploadGenerator() {
   const [pasteFeedback, setPasteFeedback] = useState({ tone: 'neutral', message: '' });
 
   useEffect(() => {
-    if (!bodyUpload?.url || !canvasRef.current) return undefined;
+    if ((!bodyUpload?.url && !headUpload?.url) || !canvasRef.current) return undefined;
 
     const renderVersion = ++renderVersionRef.current;
     setStatus('processing');
     setErrors((current) => ({ ...current, preview: '' }));
-    renderBodyPreview(canvasRef.current, bodyUpload.url, headUpload?.url, {
+    renderBodyPreview(canvasRef.current, bodyUpload?.url, headUpload?.url, {
       row: 0,
       zoom,
       background,
@@ -432,7 +432,7 @@ export default function BodyUploadGenerator() {
           </div>
           <h1 className="mt-2 text-2xl font-bold sm:text-4xl">Body and Head Preview</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#527A70] sm:mt-3 sm:text-base">
-            Upload a body and an optional head sheet to check how they look together in all four directions. Everything runs instantly inside your browser.
+            Upload a body, a head, or both to inspect every direction. Head-only files now preview immediately, and everything stays inside your browser.
           </p>
         </header>
 
@@ -459,7 +459,7 @@ export default function BodyUploadGenerator() {
           <section className="order-2 h-fit rounded-xl border border-[#B1D3B9] bg-white p-4 sm:p-5 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:sticky lg:top-24">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><h2 className="font-semibold">{previewMode === 'turntable' ? 'Interactive 360 preview' : 'Four-view comparison'}</h2><p className="mt-1 text-sm text-[#527A70]">{previewMode === 'turntable' ? 'Drag or swipe the character to rotate' : 'Front - Back - Left - Right'}</p></div>
-              {bodyUpload ? (
+              {bodyUpload || headUpload ? (
                 <button type="button" disabled={status !== 'ready'} onClick={() => downloadCanvas(canvasRef.current, previewMode === 'turntable' ? `graal-character-${TURNTABLE_VIEWS[directionIndex].id}.png` : 'graal-character-four-views.png')} className="inline-flex items-center gap-2 rounded-lg border border-[#88BDA4] px-3 py-2 text-xs font-semibold text-[#527A70] hover:bg-[#E6F2DD] disabled:cursor-wait disabled:opacity-50"><Download size={15} aria-hidden="true" /> Download preview</button>
               ) : null}
             </div>
@@ -479,7 +479,7 @@ export default function BodyUploadGenerator() {
               tabIndex={previewMode === 'turntable' ? 0 : -1}
               aria-label={previewMode === 'turntable' ? 'Interactive character turntable. Drag, swipe, or use arrow keys to rotate.' : 'Four-direction character preview.'}
             >
-              {bodyUpload ? <canvas ref={canvasRef} className="pointer-events-none size-full [image-rendering:pixelated]" aria-hidden="true" /> : previewMode === 'turntable' ? (
+              {bodyUpload || headUpload ? <canvas ref={canvasRef} className="pointer-events-none size-full [image-rendering:pixelated]" aria-hidden="true" /> : previewMode === 'turntable' ? (
                 <div className="size-full bg-[radial-gradient(circle_at_center,_white_0%,_#F8FBF5_68%)] p-10 sm:p-14">
                   <img src={DEFAULT_CHARACTER_BY_ID.get(TURNTABLE_VIEWS[directionIndex].id).url} alt="" decoding="async" className="size-full object-contain [image-rendering:pixelated]" />
                 </div>
@@ -489,7 +489,7 @@ export default function BodyUploadGenerator() {
                 </div>
               )}
 
-              {!bodyUpload ? <span className="pointer-events-none absolute left-3 top-3 z-10 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-[#527A70] shadow-sm">Sample character</span> : null}
+              {!bodyUpload && !headUpload ? <span className="pointer-events-none absolute left-3 top-3 z-10 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-[#527A70] shadow-sm">Sample character</span> : null}
 
               {previewMode === 'grid' ? (
                 <div className="pointer-events-none absolute inset-0 grid grid-cols-2 grid-rows-2">
@@ -506,7 +506,7 @@ export default function BodyUploadGenerator() {
                 </>
               )}
 
-              {bodyUpload && status === 'processing' ? <div className="absolute inset-0 flex items-center justify-center bg-white/65 text-sm font-semibold text-[#527A70]" role="status">Updating preview...</div> : null}
+              {(bodyUpload || headUpload) && status === 'processing' ? <div className="absolute inset-0 flex items-center justify-center bg-white/65 text-sm font-semibold text-[#527A70]" role="status">Updating preview...</div> : null}
             </div>
 
             {errors.preview ? <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700" role="alert">{errors.preview}</p> : null}
@@ -519,7 +519,7 @@ export default function BodyUploadGenerator() {
               <button type="button" onClick={resetPreview} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#527A70] hover:bg-[#E6F2DD]"><RotateCcw size={14} aria-hidden="true" /> Reset</button>
             </div>
 
-            <fieldset disabled={!bodyUpload} className="mt-4 space-y-4 disabled:opacity-50">
+            <fieldset disabled={!bodyUpload && !headUpload} className="mt-4 space-y-4 disabled:opacity-50">
               {headUpload ? (
                 <div className="space-y-4 rounded-lg border border-[#B1D3B9] p-3">
                   <button type="button" onClick={() => setShowHead((visible) => !visible)} className="flex w-full items-center justify-between rounded-md text-sm font-semibold">
@@ -563,9 +563,9 @@ export default function BodyUploadGenerator() {
               </label>
             </fieldset>
 
-            {bodyUpload ? (
+            {bodyUpload || headUpload ? (
               <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                <button type="button" onClick={() => downloadSource(bodyUpload.url, bodyUpload.name)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#659287] px-4 py-3 text-sm font-semibold text-white hover:bg-[#527A70]"><Download size={17} aria-hidden="true" /> Body sheet</button>
+                {bodyUpload ? <button type="button" onClick={() => downloadSource(bodyUpload.url, bodyUpload.name)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#659287] px-4 py-3 text-sm font-semibold text-white hover:bg-[#527A70]"><Download size={17} aria-hidden="true" /> Body sheet</button> : null}
                 {headUpload ? <button type="button" onClick={() => downloadSource(headUpload.url, headUpload.name)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#88BDA4] px-4 py-3 text-sm font-semibold text-[#527A70] hover:bg-[#E6F2DD]"><Download size={17} aria-hidden="true" /> Head sheet</button> : null}
               </div>
             ) : null}

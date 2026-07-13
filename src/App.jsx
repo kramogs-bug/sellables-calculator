@@ -8,6 +8,7 @@ const Calculator = lazy(() => import('./pages/Calculator'));
 const SellablesTracker = lazy(() => import('./pages/SellablesTracker'));
 const About = lazy(() => import('./pages/About'));
 const BodyUploadGenerator = lazy(() => import('./pages/BodyUploadGenerator'));
+const Privacy = lazy(() => import('./pages/Privacy'));
 
 function PageFallback() {
   return (
@@ -43,6 +44,7 @@ function App() {
           <Route path="/calculator" element={<Calculator />} />
           <Route path="/tracker" element={<SellablesTracker />} />
           <Route path="/about" element={<About />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="/body-generator" element={<BodyUploadGenerator />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

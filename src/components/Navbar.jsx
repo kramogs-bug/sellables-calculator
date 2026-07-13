@@ -6,7 +6,7 @@ const navItems = [
   { to: '/', label: 'Home', icon: Home, preload: () => import('../pages/Home') },
   { to: '/calculator', label: 'Calculator', icon: Calculator, preload: () => import('../pages/Calculator') },
   { to: '/tracker', label: 'Tracker', icon: BarChart3, preload: () => import('../pages/SellablesTracker') },
-  { to: '/body-generator', label: 'Body Upload Generator', icon: Layers3, preload: () => import('../pages/BodyUploadGenerator') },
+  { to: '/body-generator', label: 'Upload Preview', icon: Layers3, preload: () => import('../pages/BodyUploadGenerator') },
   { to: '/about', label: 'About', icon: Info, preload: () => import('../pages/About') },
 ];
 
@@ -49,7 +49,7 @@ export default function Navbar() {
           </span>
         </Link>
 
-        <div className="hidden items-center gap-1 md:flex">
+        <div className="hidden items-center gap-1 lg:flex">
           {navItems.map(({ to, label, icon, preload }) => {
             const active = pathname === to;
             return (
@@ -73,7 +73,7 @@ export default function Navbar() {
 
         <button
           type="button"
-          className="flex size-10 items-center justify-center rounded-lg text-[#527A70] hover:bg-[#E6F2DD] md:hidden"
+          className="flex size-10 items-center justify-center rounded-lg text-[#527A70] hover:bg-[#E6F2DD] lg:hidden"
           onClick={() => setIsOpen((open) => !open)}
           aria-label={isOpen ? 'Close menu' : 'Open menu'}
           aria-expanded={isOpen}
@@ -83,7 +83,7 @@ export default function Navbar() {
       </div>
 
       {isOpen ? (
-        <div className="border-t border-[#B1D3B9] bg-white px-4 py-3 md:hidden">
+        <div className="border-t border-[#B1D3B9] bg-white px-4 py-3 lg:hidden">
           {navItems.map(({ to, label, icon, preload }) => {
             const active = pathname === to;
             return (

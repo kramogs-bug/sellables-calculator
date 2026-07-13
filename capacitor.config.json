@@ -1,0 +1,8 @@
+{
+  "appId": "com.kramogs.graaltools",
+  "appName": "Graal Sellables Tools",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#E6F2DD"
+  }
+}

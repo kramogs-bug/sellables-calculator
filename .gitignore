@@ -12,6 +12,17 @@ dist
 dist-ssr
 *.local
 
+# Local Codex/refactor workspace files
+.tro-refactor/
+
+# Unfinished Sprite Editor — keep this work local until it is ready to publish.
+src/pages/SpriteEditor.jsx
+src/pages/SpriteWorkspace.jsx
+src/pages/spriteEditorBackend.js
+src/pages/spriteProjectStore.js
+src/assets/default-head.png
+src/assets/default-body.png
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

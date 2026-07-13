@@ -27,3 +27,9 @@ Before an upload, bundled sample character images keep both preview modes popula
 npm run lint
 npm run build
 ```
+
+## Android releases
+
+The Android app includes an optional user-started floating calculator. Debug APKs are built by `.github/workflows/android-debug-apk.yml`. Public signed APK and Android App Bundle artifacts are built by `.github/workflows/android-release.yml` after the repository signing secrets are configured.
+
+See [PLAY_STORE_RELEASE.md](PLAY_STORE_RELEASE.md) for signing, Play Console declarations, privacy policy, and release steps. The unfinished Sprite Editor remains local-only and is intentionally excluded from the public app and Git tracking.

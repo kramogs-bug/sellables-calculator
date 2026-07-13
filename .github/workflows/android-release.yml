@@ -1,0 +1,104 @@
+name: Build signed Android release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: "Public version name, for example 1.0.0"
+        required: true
+        default: "1.0.0"
+        type: string
+      version_code:
+        description: "Positive Play Store build number; increase it for every upload"
+        required: true
+        default: "1"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  signed-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ANDROID_VERSION_NAME: ${{ inputs.version_name }}
+      ANDROID_VERSION_CODE: ${{ inputs.version_code }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Validate version and signing secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if ! [[ "$ANDROID_VERSION_CODE" =~ ^[1-9][0-9]*$ ]]; then
+            echo "version_code must be a positive integer"
+            exit 1
+          fi
+          if ! [[ "$ANDROID_VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "version_name must look like 1.0.0"
+            exit 1
+          fi
+          for value in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!value}" ]; then
+              echo "Missing required GitHub Actions secret: $value"
+              exit 1
+            fi
+          done
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/graal-upload-key.jks"
+          chmod 600 "$RUNNER_TEMP/graal-upload-key.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/graal-upload-key.jks" >> "$GITHUB_ENV"
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Build and sync Capacitor
+        run: npm run android:sync
+
+      - name: Build signed APK and App Bundle
+        working-directory: android
+        run: ./gradlew assembleRelease bundleRelease --no-daemon
+
+      - name: Verify release signatures
+        run: |
+          APKSIGNER="$(find "$ANDROID_SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          if [ -z "$APKSIGNER" ]; then
+            echo "Android apksigner was not found"
+            exit 1
+          fi
+          "$APKSIGNER" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
+          JARSIGNER_OUTPUT="$(jarsigner -verify android/app/build/outputs/bundle/release/app-release.aab 2>&1)"
+          echo "$JARSIGNER_OUTPUT"
+          if ! grep -q "jar verified" <<< "$JARSIGNER_OUTPUT"; then
+            echo "Android App Bundle signature verification failed"
+            exit 1
+          fi
+
+      - name: Upload signed release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: graal-sellables-tools-${{ inputs.version_name }}-signed
+          path: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/bundle/release/app-release.aab
+            android/app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: error
+          retention-days: 30

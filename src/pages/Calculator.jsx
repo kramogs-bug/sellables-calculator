@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Calculator as CalculatorIcon, ChevronDown, Minus, Plus, RotateCcw, Search } from 'lucide-react';
+import AndroidFloatingCalculatorCard from '../components/AndroidFloatingCalculatorCard.jsx';
 import MobileCalculatorKeypad from '../components/MobileCalculatorKeypad.jsx';
 import useMobileCalculatorKeypad from '../hooks/useMobileCalculatorKeypad.js';
 import { SELLABLE_CATEGORIES, SELLABLE_ITEMS } from './sellablesData.js';
@@ -113,6 +114,12 @@ export default function Calculator() {
             <RotateCcw size={16} aria-hidden="true" /> Reset quantities
           </button>
         </header>
+
+        <AndroidFloatingCalculatorCard
+          total={formatNumber(total)}
+          tro={formatNumber(troValue)}
+          ratio={formatNumber(ratio)}
+        />
 
         <div className="mt-5 grid gap-6 sm:mt-8 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div>
